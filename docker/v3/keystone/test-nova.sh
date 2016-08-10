@@ -10,17 +10,17 @@ nova boot \
 --image="ewindisch/cirros:latest" \
 --nic="net-name=admin,v4-fixed-ip=10.63.0.10" \
 --security-group "demo" \
-"demo-nginx"
+"demo-cirros"
 
 nova boot \
 --flavor="m1.tiny" \
---image="ewindisch/cirros:latest" \
+--image="docker.io/nginx:latest" \
 --nic="net-name=admin,v4-fixed-ip=10.63.0.11" \
 --security-group "demo" \
 "demo-nginx-1"
 nova boot \
 --flavor="m1.tiny" \
---image="ewindisch/cirros:latest" \
+--image="docker.io/nginx:latest" \
 --nic="net-name=admin,v4-fixed-ip=10.63.0.12" \
 --security-group "demo" \
 "demo-nginx-2"

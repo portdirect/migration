@@ -21,6 +21,8 @@ RUN yum install -y \
         python-openvswitch \
         iproute \
         net-tools \
+        conntrack-tools \
+        bridge-utils \
         ethtool \
         findutils \
         iptables \

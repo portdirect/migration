@@ -4,8 +4,8 @@ ENV OS_COMP="nova" \
     OS_REPO_URL="https://github.com/openstack/nova.git" \
     OS_REPO_BRANCH="stable/mitaka" \
     OS_COMP_1="nova-docker" \
-    OS_REPO_URL_1="https://github.com/openstack/nova-docker.git" \
-    OS_REPO_BRANCH_1="stable/mitaka"
+    OS_REPO_URL_1="https://github.com/portdirect/nova-docker.git" \
+    OS_REPO_BRANCH_1="master"
 
 RUN cat /etc/apk/repositories && \
     echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
