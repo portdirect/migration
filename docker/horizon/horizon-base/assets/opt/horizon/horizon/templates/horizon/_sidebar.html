@@ -1,0 +1,100 @@
+{% load horizon i18n %}
+<div class="nav-pf-vertical nav-pf-vertical-with-secondary-nav hidden-icons-pf">
+  <ul id="sidebar-accordion"
+      class="list-group">
+    {% for dashboard, panel_info in components %}
+      {% if user|has_permissions:dashboard %}
+        {% if dashboard.slug != 'flatdash' %}
+          <li class="list-group-item persistent-secondary openstack-dashboard{% if current.slug == dashboard.slug %} active{% endif %}"
+              data-target="#sidebar-accordion-{{ dashboard.slug }}">
+            <a href="#">
+              <span class="list-group-item-value">{{ dashboard.name }}</span>
+              <span class="openstack-toggle pull-right fa"></span>
+            </a>
+            <div id="sidebar-accordion-{{ dashboard.slug }}"
+                 class="nav-pf-persistent-secondary">
+              <div class="persistent-secondary-header">
+                <a class="secondary-collapse-toggle-pf"
+                   href="#"
+                   data-toggle="collapse-secondary-nav"></a>
+                <span>{{ dashboard.name }}</span>
+              </div>
+              {% for group, panels in panel_info.iteritems %}
+                {% with panels|has_permissions_on_list:user as filtered_panels %}
+                  {% if filtered_panels %}
+                    {% if group.name %}
+                      <h5>
+                      {{ group.name }}
+                      </h5>
+                    {% endif %}
+                      <ul id="sidebar-accordion-{{ dashboard.slug }}-{{ group.slug }}"
+                          class="list-group">
+                    {% for panel in filtered_panels %}
+                      <li class="list-group-item">
+                        <a class="openstack-spin" href="{{ panel.get_absolute_url }}"
+                           target="_self"
+                           tabindex="{{ forloop.counter }}" >
+                          <span class="list-group-item-value">
+                            {{ panel.name }}
+                          </span>
+                        </a>
+                      </li>
+                    {% endfor %}
+                      </ul>
+                  {% endif %}
+                {% endwith %}
+              {% endfor %}
+            </div>
+          </li>
+        {% else %}
+          {% for group, panels in panel_info.iteritems %}
+            {% with panels|has_permissions_on_list:user as filtered_panels %}
+              {% if filtered_panels %}
+                <li class="list-group-item persistent-secondary openstack-dashboard{% if current_panel_group == group.slug %} active{% endif %}"
+                    data-target="#sidebar-accordion-{{ dashboard.slug }}-{{ group.slug }}">
+                  <a href="#">
+                    <span class="list-group-item-value">{{ group.name }}</span>
+                    <span class="openstack-toggle pull-right fa"></span>
+                  </a>
+                  <div id="sidebar-accordion-{{ dashboard.slug }}-{{ group.slug }}"
+                       class="nav-pf-persistent-secondary">
+                    <div class="persistent-secondary-header">
+                      <a class="secondary-collapse-toggle-pf"
+                         href="#"
+                         data-toggle="collapse-secondary-nav"></a>
+                      {% if group.name %}
+                        <span>
+                        {{ group.name }}
+                        </span>
+                      {% endif %}
+                    </div>
+                    {% if group.name %}
+                      <h5>
+                      {{ group.name }}
+                      </h5>
+                    {% endif %}
+                    <ul id="sidebar-accordion-{{ dashboard.slug }}-{{ group.slug }}"
+                        class="list-group">
+                    {% for panel in filtered_panels %}
+                      <li class="list-group-item">
+                        <a class="openstack-spin"
+                           href="{{ panel.get_absolute_url }}"
+                           target="_self"
+                           tabindex="{{ forloop.counter }}" >
+                          <span class="list-group-item-value">
+                            {{ panel.name }}
+                          </span>
+                        </a>
+                      </li>
+                    {% endfor %}
+                    </ul>
+                  </div>
+                </li>
+              {% endif %}
+            {% endwith %}
+          {% endfor %}
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+  </ul>
+</div>

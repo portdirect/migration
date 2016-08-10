@@ -1,0 +1,59 @@
+#  Licensed under the Apache License, Version 2.0 (the "License"); you may
+#  not use this file except in compliance with the License. You may obtain
+#  a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#  License for the specific language governing permissions and limitations
+#  under the License.
+
+Namespaces:
+  =: io.murano.apps.harbor
+  std: io.murano
+  res: io.murano.resources
+  sys: io.murano.system
+Name: Salt
+
+Extends: std:Application
+
+Properties:
+  name:
+    Contract: $.string().notNull()
+
+  InstanceConfig:
+    Contract: $.string().notNull()
+
+  instance:
+    Contract: $.class(res:HeatSWConfigLinuxInstance).notNull()
+
+
+Methods:
+  initialize:
+    Body:
+      - $._environment: $.find(std:Environment).require()
+
+  deploy:
+    Body:
+      - $._environment.reporter.report($this, 'Creating Instance for Server.')
+      - $securityGroupIngress:
+        - ToPort: 80
+          FromPort: 80
+          IpProtocol: tcp
+          External: true
+        - ToPort: 443
+          FromPort: 443
+          IpProtocol: tcp
+          External: true
+      - $._environment.securityGroupManager.addGroupIngress($securityGroupIngress)
+
+      - $config: $.InstanceConfig
+
+      - $input_values:
+          server_port: 80
+
+      - $.instance.addSoftwareConfig('heat-sw-config', $config,
+                                     inputValues=>$input_values, configGroup=>'salt')
+      - $.instance.deploy()

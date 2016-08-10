@@ -1,0 +1,43 @@
+#!/bin/bash
+
+. /tmp/harbor/gluster-poplulate-volumes
+
+: ${HARBOR_GLUSTER_VG:=harbor-gluster}
+: ${HARBOR_GLUSTER_LIB_VOL:=var-lib-glusterd}
+: ${HARBOR_GLUSTER_LIB_DIR:=/var/lib/glusterd}
+: ${HARBOR_GLUSTER_LIB_SIZE:=4G}
+
+
+: ${HARBOR_GLUSTER_DATA_POOL:=gluster-pool}
+: ${HARBOR_GLUSTER_DATA_POOL_SIZE:='90%FREE'}
+: ${HARBOR_GLUSTER_DATA_METADATA_SIZE:=1G}
+
+
+: ${GLUSTER_VOLUME_NAME:=os-initial}
+: ${GLUSTER_VOLUME_SIZE:=10G}
+
+HOSTNAME=$(hostname -s)
+HARBOROS_ETCD_ROOT=/harboros
+
+GLUSTER_ROLE=glusterfs
+
+
+prep_gluster_vol_bricks () {
+  for DISC_TYPE in ssd hdd; do
+    etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs//${DISC_TYPE}/${HOSTNAME} | grep role | \
+        while read ETCD_KEY; do
+          ROLE=$(etcdctl get ${ETCD_KEY})
+          DEVICE=$(echo ${ETCD_KEY%/*} | sed 's#.*/##')
+          if [ "${ROLE}" == "${GLUSTER_ROLE}" ]; then
+            if lvscan | grep "/dev/${HARBOR_GLUSTER_VG}-${DEVICE}/${HARBOR_GLUSTER_VG}-${DEVICE}"
+              then
+              lvcreate -V${GLUSTER_VOLUME_SIZE} -T ${HARBOR_GLUSTER_VG}-${DEVICE}/${HARBOR_GLUSTER_VG}-${DEVICE} -n ${GLUSTER_VOLUME_NAME} && \
+              mkfs.xfs -i size=512 /dev/${HARBOR_GLUSTER_VG}-${DEVICE}/${GLUSTER_VOLUME_NAME}
+            fi
+          fi
+        done
+  done
+}
+
+
+prep_gluster_vol_bricks

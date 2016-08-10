@@ -1,0 +1,18 @@
+#!/bin/bash
+export PATH=$PATH:/usr/local/bin
+: ${HARBOR_BIN_DIR:="/usr/local/bin"}
+# ${HARBOR_BIN_DIR}/harbor-docker run \
+#         --net='host' \
+#         --name harbor-network-register \
+#          docker.io/port/system-network:latest register
+touch /etc/hostname-harbor
+${HARBOR_BIN_DIR}/harbor-docker kill harbor-network-register || true
+${HARBOR_BIN_DIR}/harbor-docker rm -v harbor-network-register || true
+${HARBOR_BIN_DIR}/harbor-docker run \
+        --net='host' \
+        --name harbor-network-register \
+        -v /etc/hostname-harbor:/etc/hostname-harbor:ro \
+        -v /var/lib/cloud/instance:/var/lib/cloud/instance:ro \
+        -v /etc/harbor/auth/host:/etc/harbor/auth/host:ro \
+        docker.io/port/system-network:latest register
+${HARBOR_BIN_DIR}/harbor-docker rm -v harbor-network-register

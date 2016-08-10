@@ -1,0 +1,29 @@
+[Unit]
+Description=HarborOS: IPA
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+
+EnvironmentFile=/etc/os-common/common.env
+
+ExecStartPre=-/bin/docker-compose -f /etc/freeipa/master.yml stop
+ExecStartPre=-/bin/docker-compose -f /etc/freeipa/master.yml rm -f -v
+ExecStartPre=-/bin/docker-compose -f /etc/freeipa/master.yml pull
+
+ExecStartPre=/var/usrlocal/bin/freeipa-master-preflight.sh
+ExecStartPre=/bin/docker-compose -f /etc/freeipa/master.yml up -d
+ExecStartPre=/var/usrlocal/bin/freeipa-master-postflight.sh
+ExecStart=/bin/docker-compose -f /etc/freeipa/master.yml logs
+ExecStartPost=/usr/local/bin/harbor-docker exec etcd etcdctl set /${OS_DISTRO}/freeipa/status PRIMED
+
+ExecStop=/bin/etcdctl set /${OS_DISTRO}/freeipa/status DOWN
+ExecStop=/bin/docker-compose -f /etc/freeipa/master.yml stop
+ExecStop=-/bin/docker-compose -f /etc/freeipa/master.yml rm -f -v
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

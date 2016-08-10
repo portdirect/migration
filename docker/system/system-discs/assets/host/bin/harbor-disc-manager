@@ -1,0 +1,243 @@
+#!/bin/sh
+echo "${OS_DISTRO}: Storage Config: Glusterfs"
+echo "Now we have the master node provisioned, and two other hosts up we next"
+echo "setup storage, for subsquent systems to use"
+
+HOSTNAME=$(hostname -s)
+OS_DOMAIN=$(hostname -d)
+HARBOROS_ETCD_ROOT=/harboros
+GLUSTER_ROLE=glusterfs
+SWIFT_ROLE=swift
+CINDER_ROLE=cinder
+GLUSTER_DOMAIN=os-glusterfs.$(hostname -d)
+SWIFT_DOMAIN=$GLUSTER_DOMAIN
+export PATH=/usr/local/bin:${PATH}
+
+
+label_gluster_nodes () {
+  echo "${OS_DISTRO}: Storage Config: Labeling Glusterfs Nodes"
+  KUBE_NODES=$(kubectl get nodes --no-headers| awk -F ' ' '{print $1}')
+  for KUBE_NODE in $KUBE_NODES
+  do
+    kubectl label --overwrite node $(hostname -f) glusterfs=true
+    kubectl label --overwrite node $KUBE_NODE arch=x86
+  done
+}
+
+
+
+label_swift_nodes () {
+  echo "#########################################################################"
+  echo "${OS_DISTRO}: Storage Config: Swift: Labeling nodes"
+  echo "#########################################################################"
+  KUBE_NODES=$(kubectl get nodes --no-headers| awk -F ' ' '{print $1}')
+  for KUBE_NODE in $KUBE_NODES
+  do
+    echo "${OS_DISTRO}: Storage Config: Swift: $KUBE_NODE"
+    /usr/local/bin/kubectl label --overwrite node $KUBE_NODE swift=true
+    /usr/local/bin/kubectl label --overwrite node $(hostname -f) swift=false
+  done
+}
+
+
+label_cinder_nodes () {
+  echo "#########################################################################"
+  echo "${OS_DISTRO}: Storage Config: Cinder: Labeling nodes"
+  echo "#########################################################################"
+  KUBE_NODES=$(kubectl get nodes --no-headers| awk -F ' ' '{print $1}')
+  for KUBE_NODE in $KUBE_NODES
+  do
+    echo "${OS_DISTRO}: Storage Config: Cinder: $KUBE_NODE"
+    /usr/local/bin/kubectl label --overwrite node $KUBE_NODE cinder=true
+  done
+}
+
+
+label_devs () {
+  echo "#############################################################"
+  echo "Harbor: Storage Config"
+  echo "        enter g for gluster, c for cinder, s for swift or n for none"
+  echo "        any other input rtains current setting."
+  echo "#############################################################"
+  for DISC_TYPE in ssd hdd; do
+    echo "Defining roles for cluster $DISC_TYPE discs"
+    etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE} | grep role | \
+        while read ETCD_KEY; do
+          ROLE=$(etcdctl get ${ETCD_KEY})
+          echo "DEVICE: ${ETCD_KEY}, is defined as ${ROLE}, please enter an option:"
+          read RESPONSE </dev/tty
+          if [ "${RESPONSE}" == "g" ]; then
+            if [ "${ROLE}" !=  "${GLUSTER_ROLE}" ]; then
+              echo "Are you sure you want to change? This can data loss"
+              read RESPONSE </dev/tty
+              if [ "${RESPONSE}" == "y" ]; then
+                ROLE=$(etcdctl set ${ETCD_KEY} ${GLUSTER_ROLE})
+              fi
+            else
+              ROLE=$(etcdctl set ${ETCD_KEY} ${GLUSTER_ROLE})
+            fi
+          elif [ "${RESPONSE}" == "s" ]; then
+            if [ "${ROLE}" !=  "${SWIFT_ROLE}" ]; then
+              echo "Are you sure you want to change? This can data loss"
+              read RESPONSE </dev/tty
+              if [ "${RESPONSE}" == "y" ]; then
+                ROLE=$(etcdctl set ${ETCD_KEY} ${SWIFT_ROLE})
+              fi
+            else
+              ROLE=$(etcdctl set ${ETCD_KEY} ${SWIFT_ROLE})
+            fi
+          elif [ "${RESPONSE}" == "c" ]; then
+            if [ "${ROLE}" != "${CINDER_ROLE}" ]; then
+              echo "Are you sure you want to change? This can data loss"
+              read RESPONSE </dev/tty
+              if [ "${RESPONSE}" == "y" ]; then
+                ROLE=$(etcdctl set ${ETCD_KEY} ${CINDER_ROLE})
+              fi
+            else
+              ROLE=$(etcdctl set ${ETCD_KEY} ${CINDER_ROLE})
+            fi
+          elif [ "${RESPONSE}" == "n" ]; then
+            if [ "${ROLE}" != "none" ]; then
+              echo "Are you sure you want to change? This can data loss"
+              read RESPONSE </dev/tty
+              if [ "${RESPONSE}" == "y" ]; then
+                ROLE=$(etcdctl set ${ETCD_KEY} "none")
+              fi
+            else
+              ROLE=$(etcdctl set ${ETCD_KEY} "none")
+            fi
+          fi
+          ROLE=$(etcdctl get ${ETCD_KEY})
+          echo "Device role is now ${ROLE}"
+        done
+  done
+}
+
+list_gluster_devs () {
+  echo "#########################################################################"
+  echo "HarborOS: Storage Config: Listing Glusterfs Devices"
+  echo "#########################################################################"
+  for DISC_TYPE in ssd hdd; do
+    etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE} | grep role | \
+        while read ETCD_KEY; do
+          ROLE=$(etcdctl get ${ETCD_KEY})
+          if [ "${ROLE}" == "${GLUSTER_ROLE}" ]; then
+            echo ${ETCD_KEY%/*}
+          fi
+        done
+  done
+}
+
+
+list_cinder_devs () {
+  echo "#########################################################################"
+  echo "HarborOS: Storage Config: Listing Cinder Devices"
+  echo "#########################################################################"
+  for DISC_TYPE in ssd hdd; do
+    etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE} | grep role | \
+        while read ETCD_KEY; do
+          ROLE=$(etcdctl get ${ETCD_KEY})
+          if [ "${ROLE}" == "${CINDER_ROLE}" ]; then
+            echo ${ETCD_KEY%/*}
+          fi
+        done
+  done
+}
+
+list_swift_devs () {
+  echo "#########################################################################"
+  echo "HarborOS: Storage Config: Swift: Listing devices"
+  echo "#########################################################################"
+  for DISC_TYPE in ssd hdd; do
+    etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE} | grep role | \
+        while read ETCD_KEY; do
+          ROLE=$(etcdctl get ${ETCD_KEY})
+          if [ "${ROLE}" == "${SWIFT_ROLE}" ]; then
+            ETCD_KEY=${ETCD_KEY#"${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE}/"}
+            IFS='/' read SWIFT_HOST SWIFT_DEVICE <<< "${ETCD_KEY%/*}"
+            echo "$SWIFT_HOST.$SWIFT_DOMAIN/$SWIFT_DEVICE"
+          fi
+        done
+  done
+}
+
+
+
+
+harbor-disc-reporter
+
+label_swift_nodes
+label_gluster_nodes
+label_cinder_nodes
+
+
+label_devs
+list_gluster_devs
+list_cinder_devs
+
+list_swift_devs
+
+
+
+
+
+
+
+
+
+
+
+
+
+OS_DISTRO=HarborOS
+
+
+
+
+
+
+
+GLUSTER_VOLUMES=/tmp/gluster-volumes
+cat > ${GLUSTER_VOLUMES} <<EOF
+os-cloudkitty 100G redundancy=1 nfs.disable=yes
+os-barbican 50G redundancy=1 nfs.disable=yes
+os-gnocchi 100G redundancy=1 nfs.disable=yes
+os-mongodb 100G redundancy=1 nfs.disable=yes
+os-cinder 100G redundancy=1 nfs.disable=yes
+os-swift 100G redundancy=1 nfs.disable=yes
+os-glance 100G redundancy=1 nfs.disable=yes
+os-backup 500G redundancy=1 nfs.disable=yes
+EOF
+
+label_gluster_nodes () {
+  echo "${OS_DISTRO}: Storage Config: Labeling Glusterfs Nodes"
+  KUBE_NODES=$(kubectl get nodes --no-headers| awk -F ' ' '{print $1}')
+  for KUBE_NODE in $KUBE_NODES
+  do
+    kubectl label --overwrite node $KUBE_NODE glusterfs=true
+  done
+  kubectl label --overwrite node $KUBE_NODE glusterfs=true
+}
+
+
+populate_gluster_volumes () {
+  while read GLUSTER_VOLUME; do
+    GLUSTER_VOLUME_NAME=$(echo ${GLUSTER_VOLUME} | awk '{print $1}')
+    GLUSTER_VOLUME_SIZE=$(echo ${GLUSTER_VOLUME} | awk '{print $2}')
+    GLUSTER_VOLUME_CREATE_OPTS=$(echo ${GLUSTER_VOLUME} | awk '{print $3}')
+    GLUSTER_VOLUME_OPTS=$(echo ${GLUSTER_VOLUME} | awk '{print $4}')
+    echo "HarborOS: Gluster: ${GLUSTER_VOLUME_NAME}"
+    etcdctl set ${HARBOROS_ETCD_ROOT}/gluster-volumes/${GLUSTER_VOLUME_NAME}/options/creation "${GLUSTER_VOLUME_CREATE_OPTS}"
+    etcdctl set ${HARBOROS_ETCD_ROOT}/gluster-volumes/${GLUSTER_VOLUME_NAME}/options/runtime "${GLUSTER_VOLUME_OPTS}"
+    populate_gluster_volume () {
+        kubectl get nodes -l glusterfs=true --no-headers --output=name | sed "s,^node/,," | sed "s,.$(hostname -d),," | \
+            while read NODE; do
+                echo "${OS_DISTRO}: Gluster: Adding volume to ETCD ${GLUSTER_VOLUME_NAME}"
+                echo "NODE=${NODE}, GLUSTER_VOLUME_NAME=${GLUSTER_VOLUME_NAME}, GLUSTER_VOLUME_SIZE=${GLUSTER_VOLUME_SIZE}"
+                etcdctl set ${HARBOROS_ETCD_ROOT}/volumes/${NODE}/${GLUSTER_VOLUME_NAME} ${GLUSTER_VOLUME_SIZE}
+            done
+    }
+    populate_gluster_volume
+  done <${GLUSTER_VOLUMES}
+}
+populate_gluster_volumes

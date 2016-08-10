@@ -1,0 +1,4 @@
+FROM %%DOCKER_NAMESPACE%%/%%DOCKER_PREFIX%%cinder-base:%%DOCKER_TAG%%
+ENV OPENSTACK_SUBCOMPONENT volume
+
+COPY start.sh /start.sh

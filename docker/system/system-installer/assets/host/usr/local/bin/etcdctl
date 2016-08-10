@@ -1,0 +1,9 @@
+#!/bin/bash
+set -e
+PATH=${PATH}:/usr/local/bin
+
+exec docker-bootstrap run \
+     --rm \
+     --net=host \
+     -v /:/rootfs:ro \
+     docker.io/port/system-etcd:latest etcdctl "$@"

@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: kube-scheduler
+    version: v0.1.0
+  namespace: kube-system
+  name: kube-scheduler
+spec:
+  metadata:
+    labels:
+      k8s-app: kube-scheduler
+      kubernetes.io/cluster-service: "true"
+  hostNetwork: true
+  containers:
+  - name: kube-scheduler
+    image: docker.io/port/system-kube:latest
+    command:
+    - /hyperkube
+    - scheduler
+    - --alsologtostderr=true
+    - --master=https://kubernetes.{{OS_DOMAIN}}:6443
+    - --kubeconfig=/etc/harbor/auth/kubelet/kubeconfig.yaml
+    volumeMounts:
+      - mountPath: /etc/ssl/certs/ca-certificates.crt
+        name: os-ssl-kubelet-ca
+      - mountPath: /etc/harbor/auth/kubelet/kubeconfig.yaml
+        name: os-kubelet-config
+  volumes:
+  - name: os-ssl-kubelet-ca
+    hostPath:
+      path: "/etc/harbor/auth/kubelet/ca.crt"
+  - name: os-kubelet-config
+    hostPath:
+      path: "/etc/harbor/auth/kubelet/kubeconfig.yaml"

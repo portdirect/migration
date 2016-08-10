@@ -1,0 +1,5 @@
+#!/bin/bash
+source /etc/swarm/swarm.env
+SWARM_IP=$(ip -f inet -o addr show $SWARM_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+
+exec docker -H $SWARM_IP:2376 $@

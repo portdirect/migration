@@ -1,0 +1,25 @@
+#  Licensed under the Apache License, Version 2.0 (the "License"); you may
+#  not use this file except in compliance with the License. You may obtain
+#  a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#  License for the specific language governing permissions and limitations
+#  under the License.
+
+Format: 1.0
+Type: Application
+FullName: io.murano.apps.harbor.Salt
+Name: Salt Open
+Description: |
+ Salt Open is created and maintaind by SaltStack for complex systems management at scale. Easy enough to get running in minutes, scalable enough to manage tens of thousands of servers, and fast enough to communicate with them in seconds.
+
+ Salt is a new approach to infrastructure management built on a dynamic communication bus. Salt can be used for data-driven orchestration, remote execution for any infrastructure, configuration management for any app stack, and much more.
+
+Author: 'Pete Birley'
+Tags: [Server, Deployment, Salt]
+Classes:
+ io.murano.apps.harbor.Salt: Salt.yaml

@@ -1,0 +1,25 @@
+[Unit]
+Description=HarborOS: OpenStack: cinder Service
+After=docker.service freeipa.service os-cinder-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=/var/usrlocal/bin/os-cinder-storage-preflight.sh
+
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-cinder/kube/os-cinder-storage_daemonset.yaml --namespace=os-cinder
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-cinder/kube/os-cinder-storage_secrets.yaml --namespace=os-cinder
+
+ExecStartPre=-/usr/local/bin/kubectl create -f /etc/os-cinder/kube/os-cinder_namespace.yaml
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-cinder/kube/os-cinder-storage_secrets.yaml --namespace=os-cinder
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-cinder/kube/os-cinder-storage_daemonset.yaml --namespace=os-cinder
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-cinder/kube/os-cinder-storage_daemonset.yaml --namespace=os-cinder
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-cinder/kube/os-cinder-storage_secrets.yaml --namespace=os-cinder
+
+[Install]
+WantedBy=multi-user.target

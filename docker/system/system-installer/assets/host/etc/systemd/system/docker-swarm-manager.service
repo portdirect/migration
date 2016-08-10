@@ -1,0 +1,15 @@
+[Unit]
+Description=Docker Swarm Application Container Engine
+Documentation=https://docs.docker.com
+After=network-online.target cloud-init.service chronyd.service docker-wan.service
+Requires=docker-wan.service
+Wants=network-online.target
+
+[Service]
+ExecStartPre=/usr/local/bin/docker-swarm-manager-daemon
+ExecStart=/usr/bin/docker wait swarm-manager
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

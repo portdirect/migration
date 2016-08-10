@@ -1,0 +1,254 @@
+
+docker pull port/foreman-base:latest
+docker pull port/foreman-proxy:latest
+docker stop foreman-master
+docker rm foreman-master
+for BRIDGE_DEVICE in br0 br1 br2; do
+  # do something
+  docker stop foreman-proxy-${BRIDGE_DEVICE}
+  docker rm foreman-proxy-${BRIDGE_DEVICE}
+done
+sudo rm -rf /var/lib/harbor/foreman/pod
+
+
+
+
+
+docker run -p 444:443 -d -t \
+--name foreman-master \
+--hostname foreman.port.direct \
+--privileged \
+-v /etc/httpd \
+-v /etc/openstack/openstack.env:/etc/os-config/openstack.env:ro \
+-v /var/lib/harbor/foreman/puppet/ssl:/var/lib/puppet/ssl:rw \
+-v /var/lib/harbor/foreman/pod:/var/lib/pod:rw \
+port/foreman-base:latest /sbin/init
+
+
+for BRIDGE_DEVICE in br0 br1 br2; do
+  # do something
+  BRIDGE_IP=$(ip -f inet -o addr show ${BRIDGE_DEVICE}|cut -d\  -f 7 | cut -d/  -f 1)
+  IP=$(echo ${BRIDGE_IP} | awk -F. '{print $1"."$2"."$3".9"}')
+  sudo pipework ${BRIDGE_DEVICE} -i ${BRIDGE_DEVICE} -l foreman_${BRIDGE_DEVICE} foreman-master ${IP}/16
+done
+sudo touch /var/lib/harbor/foreman/pod/network-ready
+
+for BRIDGE_DEVICE in br0 br1 br2; do
+  # do something
+  BRIDGE_IP=$(ip -f inet -o addr show ${BRIDGE_DEVICE}|cut -d\  -f 7 | cut -d/  -f 1)
+  IP=$(echo ${BRIDGE_IP} | awk -F. '{print $1"."$2"."$3".10"}')
+  docker run -d -t \
+  --name foreman-proxy-${BRIDGE_DEVICE} \
+  --hostname foreman-proxy-${BRIDGE_DEVICE}.port.direct \
+  --privileged \
+  -v /etc/openstack/openstack.env:/etc/os-config/openstack.env:ro \
+  -v /var/lib/harbor/foreman/puppet/ssl:/var/lib/puppet/ssl:rw \
+  -v /var/lib/harbor/foreman/pod:/var/lib/pod:rw \
+  port/foreman-proxy:latest /sbin/init
+  sudo pipework ${BRIDGE_DEVICE} -i ${BRIDGE_DEVICE} -l dhcp_${BRIDGE_DEVICE} foreman-proxy-${BRIDGE_DEVICE} ${IP}/16
+  sleep 5s
+done
+
+
+
+
+
+
+docker exec -it foreman-master bash
+
+
+docker exec -it foreman-proxy-br0 bash
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+sudo rm -rf /var/lib/harbor/foreman
+
+
+
+docker pull port/foreman-base:latest
+docker pull port/foreman-puppet:latest
+docker pull port/foreman-proxy:latest
+docker pull port/foreman-master:latest
+docker stop puppet-master
+docker rm puppet-master
+docker stop foreman-master
+docker rm foreman-master
+for BRIDGE_DEVICE in br0 br1 br2; do
+  # do something
+  docker stop foreman-proxy-${BRIDGE_DEVICE}
+  docker rm foreman-proxy-${BRIDGE_DEVICE}
+done
+
+
+
+
+docker run -p 8140:8140 -d -t \
+--name puppet-master \
+--hostname puppet-master.port.direct \
+--privileged \
+-v /etc/openstack/openstack.env:/etc/os-config/openstack.env:ro \
+-v /var/lib/harbor/foreman/puppet/ssl:/var/lib/puppet/ssl:rw \
+-v /var/lib/harbor/foreman/pod:/var/pod:rw \
+port/foreman-puppet:latest /sbin/init
+docker logs -f puppet-master
+docker exec -it puppet-master bash
+
+
+docker run -p 444:443 -d -t \
+--name foreman-master \
+--hostname foreman.port.direct \
+--privileged \
+-v /etc/httpd \
+-v /etc/openstack/openstack.env:/etc/os-config/openstack.env:ro \
+-v /var/lib/harbor/foreman/pod:/var/pod:rw \
+-v /var/lib/harbor/foreman/ssh:/usr/share/foreman-proxy/.ssh/:rw \
+-v /var/lib/harbor/foreman/dynflow:/var/lib/foreman-proxy/dynflow/:rw \
+port/foreman-master:latest /sbin/init
+docker logs -f foreman-master
+
+
+for BRIDGE_DEVICE in br0 br1 br2; do
+  # do something
+  BRIDGE_IP=$(ip -f inet -o addr show ${BRIDGE_DEVICE}|cut -d\  -f 7 | cut -d/  -f 1)
+  IP=$(echo ${BRIDGE_IP} | awk -F. '{print $1"."$2"."$3".10"}')
+  docker run -d -t \
+  --name foreman-proxy-${BRIDGE_DEVICE} \
+  --hostname foreman-proxy-${BRIDGE_DEVICE}.port.direct \
+  --privileged \
+  -v /etc/openstack/openstack.env:/etc/os-config/openstack.env:ro \
+  -v /var/lib/harbor/foreman/pod:/var/pod:rw \
+  -v /var/lib/harbor/foreman/proxy-${BRIDGE_DEVICE}/tftpboot:/var/lib/tftpboot:rw \
+  -v /var/lib/harbor/foreman/proxy-${BRIDGE_DEVICE}/puppet:/var/lib/puppet/ssl:rw \
+  port/foreman-proxy:latest /sbin/init
+  sudo pipework ${BRIDGE_DEVICE} -i ${BRIDGE_DEVICE} -l dhcp_${BRIDGE_DEVICE} foreman-proxy-${BRIDGE_DEVICE} ${IP}/16
+  docker logs -f foreman-proxy-${BRIDGE_DEVICE}
+done
+
+
+BRIDGE_DEVICE=br0
+
+
+
+
+
+
+
+
+
+
+
+docker run -p 445:443 -d -t \
+--name katello-master \
+--hostname katello.port.direct \
+--privileged \
+-v /etc/httpd \
+-v /etc/openstack/openstack.env:/etc/os-config/openstack.env:ro \
+-v /var/lib/harbor/foreman/pod:/var/pod:rw \
+-v /var/lib/harbor/foreman/ssh:/usr/share/foreman-proxy/.ssh/:rw \
+-v /var/lib/harbor/foreman/dynflow:/var/lib/foreman-proxy/dynflow/:rw \
+port/katello-base:latest /sbin/init
+docker logs -f katello-master
+
+
+for BRIDGE_DEVICE in br0; do
+  # do something
+  BRIDGE_IP=$(ip -f inet -o addr show ${BRIDGE_DEVICE}|cut -d\  -f 7 | cut -d/  -f 1)
+  IP=$(echo ${BRIDGE_IP} | awk -F. '{print $1"."$2"."$3".10"}')
+  docker run -d -t \
+  --name foreman-proxy-${BRIDGE_DEVICE} \
+  --hostname foreman-proxy-${BRIDGE_DEVICE}.port.direct \
+  --privileged \
+  -v /etc/openstack/openstack.env:/etc/os-config/openstack.env:ro \
+  -v /var/lib/harbor/foreman/pod:/var/pod:rw \
+  port/foreman-proxy:latest /sbin/init
+  sudo pipework ${BRIDGE_DEVICE} -i ${BRIDGE_DEVICE} -l dhcp_${BRIDGE_DEVICE} foreman-proxy-${BRIDGE_DEVICE} ${IP}/16
+done
+
+
+docker run -d -t \
+--name foreman-proxy-master \
+--hostname foreman-proxy-master.port.direct \
+--privileged \
+-v /etc/httpd \
+-v /etc/openstack/openstack.env:/etc/os-config/openstack.env:ro \
+-v /var/lib/harbor/foreman/pod:/var/lib/pod:rw \
+port/foreman-base:latest /sbin/init
+
+
+
+
+docker exec -it foreman-master bash
+
+
+docker exec -it foreman-proxy-br0 bash

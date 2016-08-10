@@ -1,0 +1,14 @@
+[Unit]
+Description=High-performance, schema-free document-oriented database
+After=syslog.target network.target
+
+[Service]
+Type=simple
+User=mongodb
+ExecStart=/usr/bin/mongod --quiet --config /etc/mongod.conf run
+PrivateTmp=true
+LimitNOFILE=64000
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

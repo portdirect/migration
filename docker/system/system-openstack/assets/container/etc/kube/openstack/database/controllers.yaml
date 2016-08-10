@@ -1,0 +1,342 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: database-mariadb
+  name: os-mariadb
+spec:
+  capacity:
+    storage: 90Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: "/var/lib/harbor/os-database/mysql"
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: database-mariadb
+  name: os-mariadb
+  namespace: os-database
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 90Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: database-manager
+  namespace: os-database
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: database-manager
+    version: v0.1.0
+  name: database-manager
+  namespace: os-database
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: database-manager
+        version: v0.1.0
+      name: database-manager
+      namespace: os-database
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: database-manager
+          image:  docker.io/port/mariadb-manager:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-ipa-socket
+              mountPath: "/var/run/docker-ipa.sock"
+              readOnly: false
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: database-manager
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-ipa-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: database-config
+  namespace: os-database
+type: Opaque
+data:
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: database
+    version: v0.1.0
+  name: database
+  namespace: os-database
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: database
+        version: v0.1.0
+      name: database
+      namespace: os-database
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        openstack-database: 'true'
+        arch: 'x86'
+      containers:
+        - name: os-database
+          image:  docker.io/port/mariadb-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3306
+              protocol: TCP
+              name: mysql
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: data
+              mountPath: '/var/lib/mysql'
+              readOnly: false
+      volumes:
+        - name: os-config
+          secret:
+            secretName: database-config
+        - name: os-ssl
+          secret:
+            secretName: database-ssl-secret
+        - name: data
+          persistentVolumeClaim:
+            claimName: os-mariadb
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: database-mongodb
+  name: os-mongodb
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: "/var/lib/harbor/os-database/mongodb"
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: database-mongodb
+  name: os-mongodb
+  namespace: os-database
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-manager
+  namespace: os-database
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mongodb-db-user: {{MONGO_DB_USER}}
+  mongodb-db-name: {{MONGO_DB_NAME}}
+  mongodb-db-password: {{MONGO_DB_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: mongodb-manager
+    version: v0.1.0
+  name: mongodb-manager
+  namespace: os-database
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: mongodb-manager
+        version: v0.1.0
+      name: mongodb-manager
+      namespace: os-database
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: mongodb-manager
+          image:  docker.io/port/mongodb-manager:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-ipa-socket
+              mountPath: "/var/run/docker-ipa.sock"
+              readOnly: false
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: mongodb-manager
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-ipa-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-config
+  namespace: os-database
+type: Opaque
+data:
+  mongodb-db-user: {{MONGO_DB_USER}}
+  mongodb-db-name: {{MONGO_DB_NAME}}
+  mongodb-db-password: {{MONGO_DB_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: database-mongodb
+    version: v0.1.0
+  name: database-mongodb
+  namespace: os-database
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: database-mongodb
+        version: v0.1.0
+      name: database
+      namespace: os-database
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        openstack-database: 'true'
+        arch: 'x86'
+      containers:
+        - name: os-database-mongodb
+          image:  docker.io/port/mongodb-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 27017
+              protocol: TCP
+              name: mongodb
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: logs
+              mountPath: '/var/log/mongodb'
+              readOnly: false
+            - name: data
+              mountPath: '/data/db'
+              readOnly: false
+      volumes:
+        - name: os-config
+          secret:
+            secretName: mongodb-config
+        - name: logs
+          emptyDir: {}
+        - name: data
+          persistentVolumeClaim:
+            claimName: os-mongodb

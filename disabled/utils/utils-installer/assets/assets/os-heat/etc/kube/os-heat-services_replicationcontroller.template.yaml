@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-engine
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-engine-rc
+      name: {{OPENSTACK_COMPONENT}}-engine
+    spec:
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-engine
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/heat-engine:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "0.2"
+            limits:
+              memory: "256Mi"
+              cpu: "0.5"
+          securityContext:
+            privileged: false
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret

@@ -1,0 +1,15 @@
+[Unit]
+Description=FreeIPA Master Server
+After=network-online.target cloud-init.service chronyd.service docker-wan.service
+Requires=docker-wan.service
+Wants=network-online.target
+
+[Service]
+TimeoutStartSec=900
+ExecStartPre=/usr/local/bin/freeipa-master-daemon
+ExecStart=/usr/local/bin/docker-wan wait freeipa-master
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

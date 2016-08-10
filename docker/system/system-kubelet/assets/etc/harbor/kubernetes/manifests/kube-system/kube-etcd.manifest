@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: kube-etcd
+    version: v0.1.0
+  name: kube-etcd
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-etcd
+    image: docker.io/port/system-etcd:latest
+    ports:
+    - containerPort: 1401
+      hostPort: 1401
+      name: etcd-clients
+    - containerPort: 1701
+      hostPort: 1701
+      name: etcd-peers
+    command:
+    - etcd
+    - -data-dir
+    - /var/etcd/data
+    - -listen-peer-urls
+    - http://{{ETCD_SERVICE_HOST}}:1701
+    - --initial-advertise-peer-urls
+    - http://{{ETCD_SERVICE_HOST}}:1701
+    - --initial-cluster
+    - default=http://{{ETCD_SERVICE_HOST}}:1701
+    - -listen-client-urls
+    - http://127.0.0.1:1401
+    - -advertise-client-urls
+    - http://127.0.0.1:1401
+    - -initial-cluster-token
+    - kube-etcd
+    volumeMounts:
+      - mountPath: /var/etcd
+        name: etcd-kube
+  volumes:
+    - name: etcd-kube
+      hostPath:
+        path: "/var/lib/harbor/kube/etcd"

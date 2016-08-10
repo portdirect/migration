@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: undercloud-neutron-metadata
+    version: v0.1.0
+  name: undercloud-neutron-metadata
+  namespace: node-neutron
+spec:
+  hostNetwork: true
+  containers:
+  - name: undercloud-neutron-metadata
+    image: docker.io/port/undercloud-neutron:latest
+    env:
+      - name: EXPOSED_IP
+        value: {{EXPOSED_IP}}
+      - name: MARIADB_SERVICE_HOST
+        value: {{MARIADB_SERVICE_HOST}}
+      - name: RABBITMQ_SERVICE_HOST
+        value: {{RABBITMQ_SERVICE_HOST}}
+      - name: MEMCACHED_SERVICE_HOST
+        value: {{MEMCACHED_SERVICE_HOST}}
+      - name: KEYSTONE_SERVICE_HOST
+        value: {{KEYSTONE_SERVICE_HOST}}
+      - name: NOVA_METADATA_SERVICE_HOST
+        value: {{NOVA_METADATA_SERVICE_HOST}}
+      - name: NEUTRON_SERVICE_HOST
+        value: {{NEUTRON_SERVICE_HOST}}
+      - name: OVS_NB_DB_IP
+        value: {{OVS_NB_DB_IP}}
+      - name: OVS_SB_DB_IP
+        value: {{OVS_SB_DB_IP}}
+      - name: DB_ROOT_PASSWORD
+        value: password
+      - name: KEYSTONE_ADMIN_PASSWORD
+        value: password
+      - name: OVN_L3_MODE
+        value: "{{OVN_L3_MODE}}"
+    volumeMounts:
+      - mountPath: /var/run/openvswitch
+        name: var-run-openvswitch
+      - mountPath: /var/run/netns
+        name: var-run-netns
+      - mountPath: /dev
+        name: dev
+      - mountPath: /var/run
+        name: var-run
+      - mountPath: /lib/modules
+        name: lib-modules
+      - mountPath: /sys
+        name: sys
+    securityContext:
+      privileged: true
+    command:
+      - /start-metadata.sh
+  volumes:
+    - name: var-run-openvswitch
+      hostPath:
+        path: /var/run/openvswitch
+    - name: var-run-netns
+      hostPath:
+        path: /var/run/netns
+    - name: dev
+      hostPath:
+        path: /dev
+    - name: var-run
+      hostPath:
+        path: /var/run
+    - name: lib-modules
+      hostPath:
+        path: /lib/modules
+    - name: sys
+      hostPath:
+        path: /sys

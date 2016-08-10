@@ -1,0 +1,32 @@
+#!/bin/sh
+set -e
+
+# Setting defaults
+OS_DISTRO=HarborOS
+
+
+################################################################################
+echo "${OS_DISTRO}: Sourcing local environment variables"
+################################################################################
+source /etc/os-container.env
+
+export PXE_ETCDCTL="etcdctl --peers=127.0.0.1:401"
+
+
+update_pxelinux () {
+    $PXE_ETCDCTL ls --recursive / | \
+        while read ETCD_KEY; do
+          STATUS=$(etcdctl get /harboros/nodes${ETCD_KEY}/provisioned || etcdctl set /harboros/nodes${ETCD_KEY}/provisioned 'False')
+          NODE=$($PXE_ETCDCTL get ${ETCD_KEY})
+          NODE_HOSTNAME=$( echo ${ETCD_KEY} | sed -e 's/^\///' )
+          if [ "${STATUS}" == "False" ]; then
+            echo "Node: ${NODE_HOSTNAME} (${NODE}) marked as unprovisioned, defaulting to boot to Harbor AutoInstaller"
+            rm -f /usr/share/syslinux/pxelinux.cfg/01-${NODE_HOSTNAME} || true
+          else
+            echo "Node: ${NODE_HOSTNAME} (${NODE}) not marked as unprovisioned, defaulting to boot from 1st hard disc"
+            cp -f /usr/share/syslinux/pxelinux.cfg/provisioned /usr/share/syslinux/pxelinux.cfg/01-${NODE_HOSTNAME}
+          fi
+        done
+}
+
+update_pxelinux

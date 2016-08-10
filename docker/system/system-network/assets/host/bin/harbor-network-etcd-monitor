@@ -1,0 +1,9 @@
+#!/bin/bash
+export PATH=$PATH:/usr/local/bin
+: ${HARBOR_BIN_DIR:="/usr/local/bin"}
+while true
+do
+	echo "Watching etcd for updates: /ovs/network/subnets"
+	etcdctl watch --recursive  /ovs/network/subnets
+	${HARBOR_BIN_DIR}/harbor-network-update-ovs
+done

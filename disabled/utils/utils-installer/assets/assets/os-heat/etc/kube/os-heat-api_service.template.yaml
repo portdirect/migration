@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+  labels:
+    app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+spec:
+  type: NodePort
+  ports:
+  - port: 8004
+    nodePort: 8004
+    name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+    protocol: TCP
+  selector:
+    app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-cfn
+  labels:
+    app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-cfn
+spec:
+  type: NodePort
+  ports:
+  - port: 8000
+    nodePort: 8000
+    name: {{OPENSTACK_COMPONENT}}-reg
+    protocol: TCP
+  selector:
+    app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-cfn-rc

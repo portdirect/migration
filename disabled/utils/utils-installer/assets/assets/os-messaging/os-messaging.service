@@ -1,0 +1,32 @@
+[Unit]
+Description=HarborOS: OpenStack: Messaging Service
+After=docker.service freeipa.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+
+ExecStartPre=/var/usrlocal/bin/os-messaging-preflight.sh
+
+#ExecStartPre=-/bin/kubectl delete -f /etc/os-messaging/kube/os-messaging_service.yaml --namespace=os-messaging
+ExecStartPre=-/bin/kubectl delete -f /etc/os-messaging/kube/os-messaging_replicationcontroller.yaml --namespace=os-messaging
+ExecStartPre=-/bin/kubectl delete -f /etc/os-messaging/kube/os-messaging_secrets.yaml --namespace=os-messaging
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=-/bin/kubectl create -f /etc/os-messaging/kube/os-messaging_namespace.yaml
+ExecStartPre=/bin/kubectl create -f /etc/os-messaging/kube/os-messaging_secrets.yaml --namespace=os-messaging
+ExecStartPre=/bin/kubectl create -f /etc/os-messaging/kube/os-messaging_replicationcontroller.yaml --namespace=os-messaging
+
+ExecStart=/bin/kubectl create -f /etc/os-messaging/kube/os-messaging_service.yaml --namespace=os-messaging
+
+#ExecStop=-/bin/kubectl delete -f /etc/os-messaging/kube/os-messaging_service.yaml --namespace=os-messaging
+ExecStop=-/bin/kubectl delete -f /etc/os-messaging/kube/os-messaging_replicationcontroller.yaml --namespace=os-messaging
+ExecStop=-/bin/kubectl delete -f /etc/os-messaging/kube/os-messaging_secrets.yaml --namespace=os-messaging
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

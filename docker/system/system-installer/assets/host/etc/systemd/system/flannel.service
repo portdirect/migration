@@ -1,0 +1,15 @@
+[Unit]
+Description=Flannel per-node agent
+Requires=docker-bootstrap.service
+After=docker-bootstrap.service
+Before=docker.service
+
+[Service]
+User=root
+ExecStartPre=/usr/local/bin/flannel-daemon
+ExecStart=/usr/local/bin/docker-bootstrap wait flannel
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

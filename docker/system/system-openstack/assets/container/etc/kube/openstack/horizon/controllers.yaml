@@ -1,0 +1,238 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: horizon-manager
+  namespace: os-horizon
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  horizon-db-name: {{HORIZON_DB_NAME}}
+  horizon-db-user: {{HORIZON_DB_USER}}
+  horizon-db-password: {{HORIZON_DB_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: horizon-manager
+    version: v0.1.0
+  name: horizon-manager
+  namespace: os-horizon
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: horizon-manager
+        version: v0.1.0
+      name: horizon-manager
+      namespace: os-horizon
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: horizon-manager
+          image:  docker.io/port/horizon-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /lib/python2.7/site-packages/requests/cacert.pem
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: horizon-manager
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: horizon-database-config
+  namespace: os-horizon
+type: Opaque
+data:
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: horizon-database
+    version: v0.1.0
+  name: horizon-database
+  namespace: os-horizon
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: horizon-database
+        version: v0.1.0
+      name: horizon-database
+      namespace: os-horizon
+    spec:
+      nodeSelector:
+        openstack-horizon: 'true'
+        arch: 'x86'
+      containers:
+        - name: os-database
+          image:  docker.io/port/mariadb-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3306
+              protocol: TCP
+              name: mysql
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: data
+              mountPath: '/var/lib/mysql'
+              readOnly: false
+      volumes:
+        - name: os-config
+          secret:
+            secretName: horizon-database-config
+        - name: os-ssl
+          secret:
+            secretName: horizon-database-ssl-secret
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: horizon
+  namespace: os-horizon
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  horizon-db-name: {{HORIZON_DB_NAME}}
+  horizon-db-user: {{HORIZON_DB_USER}}
+  horizon-db-password: {{HORIZON_DB_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: horizon
+    version: v0.1.0
+  name: horizon
+  namespace: os-horizon
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: horizon
+        version: v0.1.0
+      name: horizon
+      namespace: os-horizon
+    spec:
+      nodeSelector:
+        openstack-horizon: 'true'
+        arch: 'x86'
+      containers:
+        - name: horizon-server
+          image: docker.io/port/horizon-api:latest
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 443
+            name: https
+            protocol: TCP
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /lib/python2.7/site-packages/requests/cacert.pem
+              readOnly: true
+          securityContext:
+            privileged: false
+        - name: horizon-memcached
+          image: docker.io/port/system-memcached:latest
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "0.1"
+            limits:
+              memory: "64Mi"
+              cpu: "0.2"
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: horizon
+        - name: os-ssl
+          secret:
+            secretName: api-ssl-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt

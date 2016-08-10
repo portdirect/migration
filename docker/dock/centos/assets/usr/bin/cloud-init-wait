@@ -1,0 +1,25 @@
+#!/bin/bash
+USER_DATA_LOC="http://169.254.169.254/2009-04-04/"
+
+maxRetries=5
+retryInterval=2
+echo "--------------------------------------------------------------"
+echo "HarborOS: Waiting for metadata server"
+echo "--------------------------------------------------------------"
+function pollMetadata() {
+  curl --output /dev/null --silent --head --fail ${USER_DATA_LOC}
+  return $?
+}
+retry=0
+until [ ${retry} -ge ${maxRetries} ]
+do
+  pollMetadata && break
+  retry=$[${retry}+1]
+  echo "Trying to contact metadata server in ${retryInterval}(s) [ attempt ${retry} of ${maxRetries}.]"
+  sleep ${retryInterval}
+done
+
+if [ ${retry} -ge ${maxRetries} ]; then
+  echo "Failed to contact metadata server after ${maxRetries} attempts!"
+  exit 1
+fi

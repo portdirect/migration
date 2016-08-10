@@ -1,0 +1,30 @@
+[Unit]
+Description=Kube Bootstrap
+After=docker-bootstrap.service harbor-network-bootstrap.service
+Requires=docker-bootstrap.service harbor-network-bootstrap.service
+
+[Service]
+StandardOutput=null
+TimeoutStartSec=0
+RemainAfterExit=yes
+Type=simple
+ExecStartPre=-/usr/local/bin/harbor-docker pull  docker.io/port/system-kube:latest
+
+ExecStartPre=-/usr/local/bin/harbor-docker stop kube-install
+ExecStartPre=-/usr/local/bin/harbor-docker kill kube-install
+ExecStartPre=-/usr/local/bin/harbor-docker rm -v kube-install
+ExecStartPre=/usr/local/bin/harbor-docker run \
+              --name kube-install \
+              --net=host \
+              -v /:/host \
+               docker.io/port/system-kube:latest harbor-install
+ExecStartPre=-/usr/local/bin/harbor-docker stop kube-install
+ExecStartPre=-/usr/local/bin/harbor-docker kill kube-install
+ExecStart=/usr/local/bin/harbor-docker rm -v kube-install
+
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

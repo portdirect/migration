@@ -1,0 +1,131 @@
+FROM centos:7
+LABEL License="Apache 2.0" \
+      Vendor="Harbor OpenStack"
+
+MAINTAINER Pete Birley <petebirley@gmail.com>
+
+# Set up repositories
+
+# Base Deps for RDO centos7-liberty
+RUN curl https://trunk.rdoproject.org/centos7-liberty/delorean-deps.repo > /etc/yum.repos.d/delorean-deps.repo && \
+    curl https://trunk.rdoproject.org/centos7-liberty/current/delorean.repo > /etc/yum.repos.d/delorean-current.repo
+#RUN curl http://trunk.rdoproject.org/centos7/current/delorean.repo > /etc/yum.repos.d/delorean-trunk.repo
+
+
+RUN yum install -y \
+        centos-logos \
+    yum install -y epel-release && \
+    yum update -y && \
+    yum install -y \
+        mariadb \
+        mariadb-libs \
+        openssl \
+        openstack-utils \
+        pyparsing \
+        python-alembic \
+        python-amqp \
+        python-amqplib \
+        python-anyjson \
+        python-boto \
+        python-cheetah \
+        python-cliff \
+        python-cmd2 \
+        python-croniter \
+        python-crypto \
+        python-d2to1 \
+        python-docutils \
+        python-dogpile-cache \
+        python-dogpile-core \
+        python-empy \
+        python-eventlet \
+        python-flask \
+        python-futures \
+        python-greenlet \
+        python-httplib2 \
+        python-iso8601 \
+        python-itsdangerous \
+        python-jinja2 \
+        python-jsonpatch \
+        python-jsonpath-rw \
+        python-jsonpointer \
+        python-jsonschema \
+        python-keyring \
+        python-kombu \
+        python-ldap \
+        python-lesscpy \
+        python-lockfile \
+        python-lxml \
+        python-markdown \
+        python-memcached \
+        python-migrate \
+        python-msgpack \
+        python-netifaces \
+        python-networkx \
+        python-oauthlib \
+        python-oslo-config \
+        python-oslo-messaging \
+        python-oslo-rootwrap \
+        python-oslo-policy \
+        python-openstackclient \
+        python-paramiko \
+        python-passlib \
+        python-paste-deploy \
+        python-pbr \
+        python-pecan \
+        python-ply \
+        python-prettytable \
+        python-psutil \
+        python-pycadf \
+        python-pygments \
+        python-pymongo \
+        python-qpid \
+        python-repoze-lru \
+        python-requests \
+        python-routes \
+        python-simplegeneric \
+        python-simplejson \
+        python-singledispatch \
+        python-six \
+        python-sqlalchemy \
+        python-stevedore \
+        python-taskflow \
+        python-versiontools \
+        python-warlock \
+        python-webob \
+        python-websockify \
+        python-webtest \
+        python-werkzeug \
+        python-wsme \
+        ipa-admintools \
+        ipa-client \
+        perl 'perl(Data::Dumper)' 'perl(Time::HiRes)' \
+        dbus-python \
+        etcd && \
+        yum clean all
+
+RUN yum install -y python-pip && \
+    yum clean all && \
+    pip install --upgrade pip
+
+ADD assets/service_hosts.sh /opt/harbor/service_hosts.sh
+ADD assets/harbor-common.sh /opt/harbor/harbor-common.sh
+ADD assets/dbus.service /etc/systemd/system/dbus.service
+ADD assets/systemctl /usr/bin/systemctl
+ADD assets/ipa-client-install /usr/sbin/ipa-client-install
+ADD assets/init-ipa.sh /init-ipa.sh
+ADD assets/init /init
+ADD start.sh /start.sh
+
+RUN chmod -v +x /usr/bin/systemctl /usr/sbin/ipa-client-install /init-ipa.sh /start.sh /init
+RUN ln -sf dbus.service /etc/systemd/system/messagebus.service
+
+ADD https://raw.github.com/jpetazzo/pipework/master/pipework /bin/pipework
+RUN chmod +x /bin/pipework
+
+
+ENV OS_DISTRO HarborOS
+
+ENV IPA_BACKED False
+ENV SECURE_CONFIG True
+
+CMD ["/init"]

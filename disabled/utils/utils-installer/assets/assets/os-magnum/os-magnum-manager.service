@@ -1,0 +1,27 @@
+[Unit]
+Description=HarborOS: OpenStack: magnum Manager: Service
+After=docker.service freeipa.service os-database.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+EnvironmentFile=/etc/os-common/common.env
+RemainAfterExit=True
+
+
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/var/usrlocal/bin/os-magnum-manager-flight.sh
+ExecStart=/bin/echo 'magnum Configured'
+ExecStartPost=/usr/local/bin/etcdctl set /${OS_DISTRO}/magnum/status DOWN
+
+ExecStop=/usr/local/bin/etcdctl set /${OS_DISTRO}/magnum/status DOWN
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-magnum/kube/os-magnum-manager_replicationcontroller.yaml --namespace=os-magnum
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=os-magnum-api.service

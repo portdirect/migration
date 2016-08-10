@@ -1,0 +1,44 @@
+#!/bin/bash
+set -e
+PATH=${PATH}:/usr/local/bin
+source /var/run/flannel/networks/wan.env
+source /etc/harbor/network.env
+
+DOCKER_BOOTSTRAP_IP=$(echo ${DOCKER_BOOTSTRAP_NETWORK} | awk -F '/' '{ print $1 }')
+
+ip link set dev docker1 down || true
+brctl delbr docker1 || true
+brctl addbr docker1 || true
+ip addr add ${FLANNEL_SUBNET} dev docker1 || true
+ip link set dev docker1 mtu 1500 || true
+ip link set dev docker1 up || true
+
+# Update the hosts file to point to docker1 ip addr
+HOST_DOCKER_IP=$(ip -f inet -o addr show docker1|cut -d\  -f 7 | cut -d/ -f 1)
+sed -i "/$(hostname -s).${OS_DOMAIN}/c\\${HOST_DOCKER_IP} $(hostname -s).${OS_DOMAIN} $(hostname -s) # Updated by docker-wan.service ($(date --utc))" /etc/hosts
+
+# Attempt to update freeipa
+/usr/local/bin/freeipa-dns-update || true
+
+exec /usr/bin/docker-current daemon \
+        --exec-opt native.cgroupdriver=systemd \
+        -H unix:///var/run/docker-wan.sock \
+        -H tcp://${HOST_DOCKER_IP}:2375 \
+        -p /var/run/docker-wan.pid \
+        --graph=/var/lib/docker-wan \
+        --bridge=docker1 \
+        --dns=${DOCKER_BOOTSTRAP_IP} \
+        --mtu=${FLANNEL_MTU} \
+        --fixed-cidr=${FLANNEL_SUBNET} \
+        --userland-proxy=false \
+        --storage-driver=overlay \
+        --cluster-advertise="docker1:2375" \
+        --cluster-store="etcd://etcd-docker.${OS_DOMAIN}:4003" \
+        --cluster-store-opt="kv.cacertfile=/etc/harbor/auth/host/ca.crt" \
+        --cluster-store-opt="kv.certfile=/etc/harbor/auth/host/host.crt" \
+        --cluster-store-opt="kv.keyfile=/etc/harbor/auth/host/host.key" \
+        --tls \
+        --tlsverify \
+        --tlscacert="/etc/harbor/auth/host/ca.crt" \
+        --tlscert="/etc/harbor/auth/host/host.crt" \
+        --tlskey="/etc/harbor/auth/host/host.key"

@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: undercloud-glance
+    version: v0.1.0
+  name: undercloud-glance
+  namespace: node-glance
+spec:
+  hostNetwork: true
+  containers:
+  - name: undercloud-glance-api
+    image: docker.io/port/undercloud-glance:latest
+    ports:
+      - containerPort: 9292
+        hostPort: 9292
+        name: g-api
+    env:
+      - name: EXPOSED_IP
+        value: {{EXPOSED_IP}}
+      - name: MARIADB_SERVICE_HOST
+        value: {{MARIADB_SERVICE_HOST}}
+      - name: RABBITMQ_SERVICE_HOST
+        value: {{RABBITMQ_SERVICE_HOST}}
+      - name: MEMCACHED_SERVICE_HOST
+        value: {{MEMCACHED_SERVICE_HOST}}
+      - name: KEYSTONE_SERVICE_HOST
+        value: {{KEYSTONE_SERVICE_HOST}}
+      - name: GLANCE_SERVICE_HOST
+        value: {{GLANCE_SERVICE_HOST}}
+      - name: GLANCE_REGISTRY_SERVICE_HOST
+        value: {{GLANCE_REGISTRY_SERVICE_HOST}}
+      - name: DB_ROOT_PASSWORD
+        value: password
+      - name: KEYSTONE_ADMIN_PASSWORD
+        value: password
+    command:
+      - /start-api.sh
+    volumeMounts:
+      - mountPath: /var/lib/glance
+        name: undercloud-glance
+  - name: undercloud-glance-registry
+    image: docker.io/port/undercloud-glance:latest
+    ports:
+      - containerPort: 9191
+        hostPort: 9191
+        name: g-reg
+    env:
+      - name: EXPOSED_IP
+        value: {{EXPOSED_IP}}
+      - name: MARIADB_SERVICE_HOST
+        value: {{MARIADB_SERVICE_HOST}}
+      - name: RABBITMQ_SERVICE_HOST
+        value: {{RABBITMQ_SERVICE_HOST}}
+      - name: MEMCACHED_SERVICE_HOST
+        value: {{MEMCACHED_SERVICE_HOST}}
+      - name: KEYSTONE_SERVICE_HOST
+        value: {{KEYSTONE_SERVICE_HOST}}
+      - name: GLANCE_SERVICE_HOST
+        value: {{GLANCE_SERVICE_HOST}}
+      - name: GLANCE_REGISTRY_SERVICE_HOST
+        value: {{GLANCE_REGISTRY_SERVICE_HOST}}
+      - name: DB_ROOT_PASSWORD
+        value: password
+      - name: KEYSTONE_ADMIN_PASSWORD
+        value: password
+    command:
+      - /start-registry.sh
+    volumeMounts:
+      - mountPath: /var/lib/glance
+        name: undercloud-glance
+  volumes:
+    - name: undercloud-glance
+      hostPath:
+        path: "/var/lib/harbor/undercloud/glance"

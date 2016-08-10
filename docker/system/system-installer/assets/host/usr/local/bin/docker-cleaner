@@ -1,0 +1,4 @@
+
+
+docker rm -v $(docker ps -a -q --no-trunc --filter "status=exited") | xargs --no-run-if-empty
+docker rmi $(docker images | grep "^<none>" | awk '{print $3}')

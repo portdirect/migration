@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: pxe
+  name: dhcp
+  namespace: os-pxe
+spec:
+  ports:
+  - port: 67
+    targetPort: 67
+    name: dhcp
+    protocol: UDP
+  - port: 68
+    targetPort: 68
+    name: bootp
+    protocol: UDP
+  selector:
+    openstack-app: pxe
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: pxe
+  name: tftp
+  namespace: os-pxe
+spec:
+  ports:
+  - port: 69
+    targetPort: 69
+    name: tftp
+    protocol: UDP
+  selector:
+    openstack-app: pxe
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: pxe
+  name: http
+  namespace: os-pxe
+spec:
+  ports:
+  - port: 79
+    targetPort: 79
+    protocol: TCP
+    name: http
+  selector:
+    openstack-app: pxe
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: pxe
+  name: etcd
+  namespace: os-pxe
+spec:
+  ports:
+  - port: 401
+    targetPort: 401
+    protocol: TCP
+    name: etcd
+  selector:
+    openstack-app: pxe

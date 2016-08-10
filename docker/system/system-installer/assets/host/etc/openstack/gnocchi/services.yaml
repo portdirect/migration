@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: gnocchi
+  name: os-gnocchi
+  namespace: os-gnocchi
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    targetPort: 8041
+    protocol: TCP
+    name: https
+  selector:
+    openstack-app: gnocchi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: gnocchi-metricd
+  name: gnocchi-metricd
+  namespace: os-gnocchi
+spec:
+  clusterIP: 'None'
+  ports:
+  - port: 1
+  selector:
+    openstack-app: gnocchi-metricd
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: grafana
+  name: os-grafana
+  namespace: os-gnocchi
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    targetPort: 3000
+    protocol: TCP
+    name: https
+  selector:
+    openstack-app: grafana

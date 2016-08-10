@@ -1,0 +1,29 @@
+[Unit]
+Description=HarborOS: OpenStack: heat Service
+After=docker.service freeipa.service os-heat-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=/var/usrlocal/bin/os-heat-api-preflight.sh
+
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-heat/kube/os-heat-api_service.yaml --namespace=os-heat
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-heat/kube/os-heat-api_replicationcontroller.yaml --namespace=os-heat
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-heat/kube/os-heat_secrets.yaml --namespace=os-heat
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-heat/kube/os-heat_secrets.yaml --namespace=os-heat
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-heat/kube/os-heat-api_replicationcontroller.yaml --namespace=os-heat
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-heat/kube/os-heat-api_service.yaml --namespace=os-heat
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-heat/kube/os-heat-api_service.yaml --namespace=os-heat
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-heat/kube/os-heat-api_replicationcontroller.yaml --namespace=os-heat
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-heat/kube/os-heat_secrets.yaml --namespace=os-heat
+
+[Install]
+WantedBy=multi-user.target

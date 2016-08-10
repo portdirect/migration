@@ -1,0 +1,44 @@
+[Unit]
+Description=HarborOS: OpenStack: DataBases Service
+After=docker.service freeipa.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+
+ExecStartPre=/var/usrlocal/bin/os-accounts-preflight.sh
+
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-accounts/kube/os-accounts_service.yaml --namespace=os-accounts
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-accounts/kube/os-accounts_daemonset.yaml --namespace=os-accounts
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-accounts/kube/os-accounts_secrets.yaml --namespace=os-accounts
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-accounts/kube/os-accounts_volume_claim.yaml --namespace=os-accounts
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-accounts/kube/os-accounts_volume_definition.yaml --namespace=os-accounts
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-accounts
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-accounts
+
+ExecStartPre=/var/usrlocal/bin/accounts-service-status.sh
+
+ExecStartPre=-/usr/local/bin/kubectl create -f /etc/os-accounts/kube/os-accounts_namespace.yaml
+#ExecStartPre=-/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-accounts
+#ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-accounts
+#ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-accounts/kube/os-accounts_volume_definition.yaml --namespace=os-accounts
+#ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-accounts/kube/os-accounts_volume_claim.yaml --namespace=os-accounts
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-accounts/kube/os-accounts_secrets.yaml --namespace=os-accounts
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-accounts/kube/os-accounts_daemonset.yaml --namespace=os-accounts
+
+ExecStartPost=-/usr/local/bin/kubectl create -f /etc/os-accounts/kube/os-accounts_service.yaml --namespace=os-accounts
+
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-accounts/kube/os-accounts_service.yaml --namespace=os-accounts
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-accounts/kube/os-accounts_daemonset.yaml --namespace=os-accounts
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-accounts/kube/os-accounts_secrets.yaml --namespace=os-accounts
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-accounts/kube/os-accounts_volume_claim.yaml --namespace=os-accounts
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-accounts/kube/os-accounts_volume_definition.yaml --namespace=os-accounts
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-accounts
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-accounts
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

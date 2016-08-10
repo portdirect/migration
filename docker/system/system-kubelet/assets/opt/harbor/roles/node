@@ -1,0 +1,22 @@
+#!/bin/sh
+export KUBE_STATUS="$(cat /etc/harbor/kube-status)"
+. /opt/harbor/scripts/environment-variables
+. /opt/harbor/scripts/helper-manifests
+
+echo "Prepping common manifests"
+prep_manifests common
+
+echo "Waiting for br-int to exist"
+until ovs-vsctl br-exists br-int; do
+sleep 1; echo "Waiting for br-int...";
+done;
+
+echo "Prepping memcached manifests"
+prep_manifests undercloud-memcached
+echo "Prepping nova manifests"
+prep_manifests undercloud-novacompute
+
+if [ "$KUBE_STATUS" = "BOOTSTRAPPING" ]; then
+  echo "Node Bootstrapping Complete"
+  echo "BOOTSTRAPPED" > /etc/harbor/kube-status
+fi;

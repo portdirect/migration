@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: kube-proxy
+    version: v0.1.0
+  namespace: kube-system
+  name: kube-proxy
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-proxy
+    image: docker.io/port/system-kube:latest
+    command:
+    - /hyperkube
+    - proxy
+    - --proxy-mode=iptables
+    - --alsologtostderr=true
+    - --bind-address=0.0.0.0
+    - --master=https://kubernetes.{{OS_DOMAIN}}:6443
+    - --kubeconfig=/etc/harbor/auth/kubelet/kubeconfig.yaml
+    securityContext:
+      privileged: true
+    volumeMounts:
+      - mountPath: /etc/ssl/certs/ca-certificates.crt
+        name: os-ssl-kubelet-ca
+      - mountPath: /etc/harbor/auth/kubelet/kubeconfig.yaml
+        name: os-kubelet-config
+  volumes:
+  - name: os-ssl-kubelet-ca
+    hostPath:
+      path: "/etc/harbor/auth/kubelet/ca.crt"
+  - name: os-kubelet-config
+    hostPath:
+      path: "/etc/harbor/auth/kubelet/kubeconfig.yaml"

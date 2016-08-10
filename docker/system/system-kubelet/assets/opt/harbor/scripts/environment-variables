@@ -1,0 +1,33 @@
+#!/bin/sh
+. /etc/harbor/kube.env
+
+export NODE_HOSTNAME="$(hostname -f)"
+export NODE_PRIMARY_DEV=eth0
+export NODE_IP="$(ip -f inet -o addr show eth0|cut -d\  -f 7 | cut -d/ -f 1)"
+export NODE_PUBLIC_IP="$(ip -f inet -o addr show ${NODE_PRIMARY_DEV}|cut -d\  -f 7 | cut -d/ -f 1)"
+
+export EXPOSED_IP="${NODE_IP}"
+export MASTER_IP="10.142.0.15"
+export ETCD_SERVICE_HOST="${MASTER_IP}"
+
+export OVS_SB_DB_IP="${MASTER_IP}"
+export OVS_NB_DB_IP="${MASTER_IP}"
+export OVN_L3_MODE="False"
+export KUBE_SERVICE_HOST="${MASTER_IP}"
+export RABBITMQ_SERVICE_HOST="${MASTER_IP}"
+export MEMCACHED_SERVICE_HOST="${MASTER_IP}"
+export MARIADB_SERVICE_HOST="${MASTER_IP}"
+export KEYSTONE_SERVICE_HOST="${MASTER_IP}"
+export NEUTRON_SERVICE_HOST="${MASTER_IP}"
+export NOVA_SERVICE_HOST="${MASTER_IP}"
+export NOVA_METADATA_SERVICE_HOST="${MASTER_IP}"
+export GLANCE_SERVICE_HOST="${MASTER_IP}"
+export GLANCE_REGISTRY_SERVICE_HOST="${MASTER_IP}"
+export OCTAVIA_SERVICE_HOST="${MASTER_IP}"
+export OCTAVIA_HEALTH_SERVICE_HOST="${MASTER_IP}"
+export CINDER_SERVICE_HOST="${MASTER_IP}"
+
+
+
+
+export DB_ROOT_PASSWORD="password"

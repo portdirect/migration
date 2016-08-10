@@ -1,0 +1,30 @@
+[Unit]
+Description=HarborOS: OpenStack: swift Service
+After=docker.service freeipa.service os-swift-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=/var/usrlocal/bin/os-swift-proxy-preflight.sh
+
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-swift/kube/os-swift-proxy_service.yaml --namespace=os-swift
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-swift/kube/os-swift-proxy_replicationcontroller.yaml --namespace=os-swift
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-swift/kube/os-swift_secrets.yaml --namespace=os-swift
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=-/usr/local/bin/kubectl create -f /etc/os-swift/kube/os-swift_namespace.yaml
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-swift/kube/os-swift_secrets.yaml --namespace=os-swift
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-swift/kube/os-swift-proxy_replicationcontroller.yaml --namespace=os-swift
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-swift/kube/os-swift-proxy_service.yaml --namespace=os-swift
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-swift/kube/os-swift-proxy_service.yaml --namespace=os-swift
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-swift/kube/os-swift-proxy_replicationcontroller.yaml --namespace=os-swift
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-swift/kube/os-swift_secrets.yaml --namespace=os-swift
+
+[Install]
+WantedBy=multi-user.target

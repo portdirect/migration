@@ -1,0 +1,13 @@
+[Unit]
+Description=OpenStack Trove guestagent Service
+After=syslog.target network.target
+
+[Service]
+Type=simple
+User=trove
+ExecStartPre=/bin/bash -c "sudo chown -R mongodb:mongodb /var/run/mongodb"
+ExecStart=/usr/bin/trove-guestagent --config-file /etc/trove/trove-guestagent.conf --config-file /etc/trove/conf.d/guest_info.conf
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

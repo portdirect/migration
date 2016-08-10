@@ -1,0 +1,593 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: os-swift
+  name: os-swift
+spec:
+  capacity:
+    storage: 200Gi
+  accessModes:
+    - ReadWriteMany
+  glusterfs:
+    endpoints: gluster-fs
+    path: os-swift
+    readOnly: false
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: os-swift
+  name: os-swift
+  namespace: os-swift
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 200Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: swift-manager
+  namespace: os-swift
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  core-etcd-endpoint: {{CORE_ETCD_ENDPOINT}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+  swift-keystone-user: {{SWIFT_KEYSTONE_USER}}
+  swift-keystone-password: {{SWIFT_KEYSTONE_PASSWORD}}
+  swift-device: {{SWIFT_DEVICE}}
+  swift-hash-path-suffix: {{SWIFT_HASH_PATH_SUFFIX}}
+  swift-hash-path-prefix: {{SWIFT_HASH_PATH_PREFIX}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: swift-manager
+    version: v0.1.0
+  name: swift-manager
+  namespace: os-swift
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: swift-manager
+        version: v0.1.0
+      name: swift-manager
+      namespace: os-swift
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: swift-manager
+          image:  docker.io/port/swift-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: swift-manager
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: swift
+  namespace: os-swift
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  swift-keystone-user: {{SWIFT_KEYSTONE_USER}}
+  swift-keystone-password: {{SWIFT_KEYSTONE_PASSWORD}}
+  swift-device: {{SWIFT_DEVICE}}
+  swift-hash-path-prefix: {{SWIFT_HASH_PATH_SUFFIX}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: swift
+    version: v0.1.0
+  name: swift
+  namespace: os-swift
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: swift
+        version: v0.1.0
+      name: swift
+      namespace: os-swift
+    spec:
+      nodeSelector:
+        openstack-swift: 'true'
+        arch: 'x86'
+      containers:
+        - name: swift-proxy
+          image: docker.io/port/swift-proxy-server:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+          - containerPort: 8080
+            name: https
+            protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: swift-shared
+              mountPath: "/etc/os-swift"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: proxy-signing-cache
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: swift-proxy-memcached
+          image: docker.io/port/system-memcached:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "0.1"
+            limits:
+              memory: "64Mi"
+              cpu: "0.2"
+          securityContext:
+            privileged: false
+      volumes:
+        - name: os-config
+          secret:
+            secretName: swift
+        - name: os-ssl
+          secret:
+            secretName: swift-ssl-secret
+        - name: swift-shared
+          persistentVolumeClaim:
+            claimName: os-swift
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: proxy-signing-cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: swift-storage
+  namespace: os-swift
+type: Opaque
+data:
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  swift-device: {{SWIFT_DEVICE}}
+  swift-hash-path-prefix: {{SWIFT_HASH_PATH_SUFFIX}}
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: swift-storage
+    version: v0.1.0
+  name: swift-storage
+  namespace: os-swift
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: swift-storage
+        version: v0.1.0
+      name: swift-storage
+      namespace: os-swift
+    spec:
+      nodeSelector:
+        storage: 'true'
+        swift-storage: 'true'
+        arch: 'x86'
+      containers:
+        - name: swift-storage-object-server
+          image: docker.io/port/swift-object-server:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: swift-shared
+              mountPath: "/etc/os-swift"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: var-lock
+              mountPath: "/var/lock"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+        - name: swift-storage-object-auditor
+          image: docker.io/port/swift-object-auditor:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: swift-shared
+              mountPath: "/etc/os-swift"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: var-lock
+              mountPath: "/var/lock"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+        - name: swift-storage-object-replicator
+          image: docker.io/port/swift-object-replicator:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: ETCDCTL_ENDPOINT
+              value: {{ETCDCTL_ENDPOINT}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: swift-shared
+              mountPath: "/etc/os-swift"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: var-lock
+              mountPath: "/var/lock"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+        - name: swift-storage-object-updater
+          image: docker.io/port/swift-object-updater:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: swift-shared
+              mountPath: "/etc/os-swift"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: var-lock
+              mountPath: "/var/lock"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+        - name: swift-storage-container-server
+          image: docker.io/port/swift-container-server:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: swift-shared
+              mountPath: "/etc/os-swift"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: var-lock
+              mountPath: "/var/lock"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+        - name: swift-storage-account-server
+          image: docker.io/port/swift-account-server:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: swift-shared
+              mountPath: "/etc/os-swift"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: var-lock
+              mountPath: "/var/lock"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+        - name: swift-storage-rsync
+          image: docker.io/port/swift-rsync:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: var-lock
+              mountPath: "/var/lock"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+        - name: swift-storage-memcached
+          image: docker.io/port/system-memcached:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "0.1"
+            limits:
+              memory: "64Mi"
+              cpu: "0.2"
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: swift-storage
+        - name: swift-shared
+          persistentVolumeClaim:
+            claimName: os-swift
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: srv-node
+          hostPath:
+            path: /var/lib/os-swift
+        - name: var-lock
+          emptyDir: {}
+        - name: var-cache-swift
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: swift-object-expirer
+  namespace: os-swift
+type: Opaque
+data:
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  swift-device: {{SWIFT_DEVICE}}
+  swift-hash-path-prefix: {{SWIFT_HASH_PATH_SUFFIX}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: swift-object-expirer
+    version: v0.1.0
+  name: swift-object-expirer
+  namespace: os-swift
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: swift-object-expirer
+        version: v0.1.0
+      name: swift-object-expirer
+      namespace: os-swift
+    spec:
+      nodeSelector:
+        openstack-swift: 'true'
+        arch: 'x86'
+      containers:
+        - name: swift-storage-object-expirer
+          image: docker.io/port/swift-object-expirer:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: swift-shared
+              mountPath: "/etc/os-swift"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: swift-object-expirer
+        - name: swift-shared
+          persistentVolumeClaim:
+            claimName: os-swift
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt

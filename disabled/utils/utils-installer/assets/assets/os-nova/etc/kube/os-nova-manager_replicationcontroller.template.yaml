@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rc
+      name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+    spec:
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/nova-manager:{{OS_RELEASE}}
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          resources:
+            limits:
+              cpu: "0.20"
+          securityContext:
+            privileged: true
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret

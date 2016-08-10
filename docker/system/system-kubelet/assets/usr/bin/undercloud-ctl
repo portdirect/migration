@@ -1,0 +1,38 @@
+#!/bin/sh
+
+. /opt/harbor/scripts/environment-variables
+. /opt/harbor/scripts/helper-manifests
+
+
+prep_manifests common
+prep_manifests core
+wait-http ${ETCD_SERVICE_HOST}:4001/v2/keys
+prep_manifests kube-system
+wait-http 127.0.0.1:8080
+
+prep_manifests ovn
+prep_manifests undercloud-memcached
+prep_manifests undercloud-rabbitmq
+
+
+prep_manifests undercloud-mysql
+wait-mysql
+
+
+prep_manifests undercloud-keystone
+wait-http ${KEYSTONE_SERVICE_HOST}:5000
+
+prep_manifests undercloud-neutron
+wait-http ${NEUTRON_SERVICE_HOST}:9696
+
+prep_manifests undercloud-glance
+wait-http ${GLANCE_SERVICE_HOST}:9292
+
+prep_manifests undercloud-nova
+wait-http ${NOVA_SERVICE_HOST}:8774
+prep_manifests undercloud-novacompute
+
+prep_manifests undercloud-horizon
+wait-http ${EXPOSED_IP}:80
+
+#prep_manifests post-neutron

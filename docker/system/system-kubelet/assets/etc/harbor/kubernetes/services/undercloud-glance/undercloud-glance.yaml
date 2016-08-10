@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    harbor-app: undercloud-glance
+    version: v0.1.0
+  name: undercloud-glance-api
+  namespace: node-glance
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 9292
+    targetPort: 9292
+    protocol: TCP
+    name: glance
+  selector:
+    harbor-app: undercloud-glance
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    harbor-app: undercloud-glance
+    version: v0.1.0
+  name: undercloud-glance-reg
+  namespace: node-glance
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 9191
+    targetPort: 9191
+    protocol: TCP
+    name: glance-reg
+  selector:
+    harbor-app: undercloud-glance

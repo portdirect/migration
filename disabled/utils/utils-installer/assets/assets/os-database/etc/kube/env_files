@@ -1,0 +1,4 @@
+/etc/os-common/common.env
+/etc/freeipa/credentials-client-provisioning.env
+/etc/os-database/os-database.env
+/etc/os-database/credentials-os-database.env

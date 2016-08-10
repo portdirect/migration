@@ -1,0 +1,13 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: {{OPENSTACK_COMPONENT}}
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  glusterfs:
+    endpoints: os-glusterfs
+    path: os-accounts
+    readOnly: false

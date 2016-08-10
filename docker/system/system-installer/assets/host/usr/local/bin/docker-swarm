@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+PATH=${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+
+exec docker \
+    -H="tcp://docker-swarm.${OS_DOMAIN}:4000" \
+    --tls \
+    --tlscacert="/etc/harbor/auth/host/ca.crt" \
+    --tlscert="/etc/harbor/auth/host/host.crt" \
+    --tlskey="/etc/harbor/auth/host/host.key" \
+    --tlsverify \
+    "$@"

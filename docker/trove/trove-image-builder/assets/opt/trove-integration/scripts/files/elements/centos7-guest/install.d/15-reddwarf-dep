@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# CONTEXT: GUEST during CONSTRUCTION as ROOT
+# PURPOSE: Install trove guest python dependencies - see redstack functions_qemu
+
+set -e
+set -o xtrace
+
+yum install -y openstack-trove-guestagent
+git clone https://github.com/openstack/trove.git /opt/trove
+yum install -y python-devel libxml2-devel libxslt-devel python-setuptools     python-sqlalchemy python-lxml     python-routes python-eventlet python-webob     python-kombu python-paste-deploy python-paste python-netaddr     python-httplib2 python-iso8601 python-pip python-mysql     python-migrate python-anyjson gcc python-pexpect mysql-devel
+
+yum install -y python-pip
+pip install --upgrade pip
+pip install --upgrade /opt/trove
+pip install --upgrade six

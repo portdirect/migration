@@ -1,0 +1,63 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rc
+      name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+    spec:
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/ceilometer-polling:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: sys-fs-cgroup
+              mountPath: /sys/fs/cgroup
+              readOnly: false
+            - name: var-run-netns
+              mountPath: /var/run/netns
+              readOnly: true
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: host-dev
+              mountPath: /dev
+              readOnly: true
+            - name: host-run
+              mountPath: /run
+              readOnly: true
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.5"
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      hostPID: true
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret
+        - name: sys-fs-cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+        - name: var-run-netns
+          hostPath:
+            path: /var/run/netns
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: host-dev
+          hostPath:
+            path: /dev
+        - name: host-run
+          hostPath:
+            path: /run

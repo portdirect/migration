@@ -1,0 +1,153 @@
+#!/bin/sh
+set -e
+export KUBE_STATUS="$(cat /etc/harbor/kube-status)"
+. /opt/harbor/scripts/environment-variables
+. /opt/harbor/scripts/helper-manifests
+
+
+echo "Prepping common manifests"
+prep_manifests common
+
+echo "Waiting for br-int to exist"
+until ovs-vsctl br-exists br-int; do
+sleep 1; echo "Waiting for br-int...";
+done;
+
+echo "Prepping core manifests"
+prep_manifests core
+if [ "$KUBE_STATUS" = "BOOTSTRAPPING" ]; then
+  echo "Waiting for etcd"
+  wait-http ${ETCD_SERVICE_HOST}:4001/v2/keys
+fi;
+
+
+echo "Prepping kube-system config"
+cfg=/etc/harbor/kube_openstack_config
+cat > $cfg <<EOF
+[Global]
+auth-url="http://127.0.0.1:5000/v2.0"
+Username="admin"
+Password="password"
+tenant-name="admin"
+[LoadBalancer]
+subnet-id="34140045-9599-4231-ad40-566dac61ade1"
+create-monitor="no"
+monitor-delay="1m"
+monitor-timeout="30s"
+monitor-max-retries="3"
+EOF
+
+
+echo "Prepping kube-system manifests"
+prep_manifests kube-system
+if [ "$KUBE_STATUS" = "BOOTSTRAPPING" ]; then
+  echo "Waiting for kubernetes api"
+  wait-http 127.0.0.1:8080
+fi;
+wait-http 127.0.0.1:8080
+kubectl get namespace node-etcd || kubectl create namespace node-etcd
+
+
+echo "Prepping swarm manifests"
+prep_manifests swarm
+
+
+echo "Prepping cockpit manifests"
+prep_manifests cockpit
+kubectl get namespace node-cockpit || kubectl create namespace node-cockpit
+
+
+echo "Prepping ovn manifests"
+prep_manifests ovn
+kubectl get namespace node-ovn || kubectl create namespace node-ovn
+
+
+echo "Prepping memcached manifests"
+prep_manifests undercloud-memcached
+kubectl get namespace node-memcached || kubectl create namespace node-memcached
+
+
+echo "Prepping rabbitmq manifests"
+prep_manifests undercloud-rabbitmq
+kubectl get namespace node-rabbitmq || kubectl create namespace node-rabbitmq
+
+
+echo "Prepping mysql manifests"
+prep_manifests undercloud-mysql
+if [ "$KUBE_STATUS" = "BOOTSTRAPPING" ]; then
+  echo "Waiting for mysql"
+  wait-mysql
+fi;
+kubectl get namespace node-mariadb || kubectl create namespace node-mariadb
+
+
+echo "Prepping keystone manifests"
+prep_manifests undercloud-keystone
+if [ "$KUBE_STATUS" = "BOOTSTRAPPING" ]; then
+  echo "Waiting for keystone"
+  wait-http ${KEYSTONE_SERVICE_HOST}:5000
+fi;
+kubectl get namespace node-keystone || kubectl create namespace node-keystone
+
+
+echo "Prepping neutron manifests"
+prep_manifests undercloud-neutron
+if [ "$KUBE_STATUS" = "BOOTSTRAPPING" ]; then
+  echo "Waiting for neutron"
+  wait-http ${NEUTRON_SERVICE_HOST}:9696
+fi;
+kubectl get namespace node-neutron || kubectl create namespace node-neutron
+
+
+echo "Prepping glance manifests"
+prep_manifests undercloud-glance
+if [ "$KUBE_STATUS" = "BOOTSTRAPPING" ]; then
+  echo "Waiting for glance"
+  wait-http ${GLANCE_SERVICE_HOST}:9292
+fi;
+kubectl get namespace node-glance || kubectl create namespace node-glance
+
+
+echo "Prepping nova manifests"
+prep_manifests undercloud-nova
+if [ "$KUBE_STATUS" = "BOOTSTRAPPING" ]; then
+  echo "Waiting for nova"
+  wait-http ${NOVA_SERVICE_HOST}:8774
+fi;
+kubectl get namespace node-nova || kubectl create namespace node-nova
+
+
+echo "Prepping cinder manifests"
+prep_manifests undercloud-cinder
+if [ "$KUBE_STATUS" = "BOOTSTRAPPING" ]; then
+  echo "Waiting for cinder"
+  wait-http ${CINDER_SERVICE_HOST}:8776
+fi;
+kubectl get namespace node-cinder || kubectl create namespace node-cinder
+
+
+echo "Prepping nova-compute manifests"
+prep_manifests undercloud-novacompute
+
+echo "Prepping cinder-volume manifests"
+prep_manifests undercloud-cindervolume
+
+
+echo "Prepping horizon manifests"
+prep_manifests undercloud-horizon
+if [ "$KUBE_STATUS" = "BOOTSTRAPPING" ]; then
+  echo "Waiting for horizon"
+  wait-http ${EXPOSED_IP}:80
+fi;
+kubectl get namespace node-horizon || kubectl create namespace node-horizon
+
+
+echo "Prepping post-neutron manifests"
+prep_manifests post-neutron
+
+#prep_manifests undercloud-octavia
+
+if [ "$KUBE_STATUS" = "BOOTSTRAPPING" ]; then
+  echo "Node Bootstrapping Complete"
+  echo "BOOTSTRAPPED" > /etc/harbor/kube-status
+fi;

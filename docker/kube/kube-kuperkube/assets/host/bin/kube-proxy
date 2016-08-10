@@ -1,0 +1,24 @@
+#!/bin/bash
+source /etc/kube/kube.env
+: ${KUBE_PORT:=6443}
+: ${KUBE_MASTER_HOST:="kubernetes.$(hostname -d)"}
+
+touch /etc/harbor/auth/kubelet/ca.crt
+touch /etc/harbor/auth/kubelet/kubeconfig.yaml
+
+exec /usr/local/bin/harbor-docker run \
+        --name=kube-proxy \
+        --net='host' \
+        --privileged \
+        --restart=always \
+        -d \
+        -v /etc/machine-id:/etc/machine-id:ro \
+        -v /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:rw \
+        -v /etc/harbor/auth/kubelet/ca.crt:/etc/ssl/certs/ca-certificates.crt:ro \
+        -v /etc/harbor/auth/kubelet/kubeconfig.yaml:/etc/harbor/auth/kubelet/kubeconfig.yaml:ro \
+         docker.io/port/x86-kube:latest /hyperkube proxy \
+            --alsologtostderr=true \
+            --bind-address=0.0.0.0 \
+            --v=3 \
+            --master=https://${KUBE_MASTER_HOST}:${KUBE_PORT} \
+            --kubeconfig="/etc/harbor/auth/kubelet/kubeconfig.yaml"

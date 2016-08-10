@@ -1,0 +1,46 @@
+export OS_USERNAME=admin
+export OS_PASSWORD=Password123
+#export OS_DOMAIN_NAME=CANNY.IO
+export OS_PROJECT_NAME=canny
+export OS_TENANT_NAME=""
+export OS_USER_DOMAIN_NAME=CANNY.IO
+export OS_PROJECT_DOMAIN_NAME=CANNY.IO
+export OS_AUTH_URL=http://keystone.canny.io:5000/v3/
+export OS_IDENTITY_API_VERSION=3
+export PS1="[(admin@CANNY.IO) \u@\h \W] ⌘ "
+
+
+yum install -y wget 
+wget https://fedorapeople.org/groups/magnum/fedora-21-atomic-5.qcow2 -O fedora-21-atomic-5.qcow2 
+
+
+openstack image create \
+          --file fedora-21-atomic-5.qcow2 \
+          --disk-format qcow2 \
+          --container-format bare \
+          --public \
+          --property hypervisor_type=QEMU \
+          --property os_distro=fedora-atomic \
+          "fedora-21-atomic"
+
+pip install python-magnumclient
+
+env -i bash
+
+export OS_USERNAME=admin
+export OS_PASSWORD=Password123
+export OS_TENANT_NAME=canny
+export OS_AUTH_URL=http://keystone.canny.io:5000/v2.0/
+
+
+
+magnum baymodel-create --name k8sbaymodel \
+                       --image-id fedora-21-atomic \
+                       --keypair-id testkey \
+                       --external-network-id public \
+                       --dns-nameserver 8.8.8.8 \
+                       --flavor-id m1.small \
+                       --docker-volume-size 5 \
+                       --network-driver flannel \
+                       --coe kubernetes
+magnum bay-create --name k8sbay --baymodel k8sbaymodel --node-count 1

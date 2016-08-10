@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: undercloud-ovn-northbound-db
+    version: v0.1.0
+  name: undercloud-ovn-northbound-db
+  namespace: node-ovn
+spec:
+  hostNetwork: true
+  containers:
+  - name: undercloud-ovn-northbound
+    image: docker.io/port/ovn:latest
+    ports:
+      - containerPort: 6641
+        hostPort: 6641
+        name: ovs-db
+    env:
+      - name: EXPOSED_IP
+        value: {{EXPOSED_IP}}
+    command:
+      - /start-server-ovsdb-north.sh
+    volumeMounts:
+      - mountPath: /var/run/openvswitch
+        name: var-run-openvswitch
+  volumes:
+    - name: var-run-openvswitch
+      hostPath:
+        path: /var/run/openvswitch

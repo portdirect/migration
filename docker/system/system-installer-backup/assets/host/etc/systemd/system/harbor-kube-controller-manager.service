@@ -1,0 +1,22 @@
+[Unit]
+Description=Kube Controller Manager
+After=harbor-kube-bootstrap.service
+Requires=harbor-kube-bootstrap.service
+
+[Service]
+StandardOutput=null
+TimeoutStartSec=0
+RemainAfterExit=yes
+Type=simple
+
+ExecStartPre=-/usr/local/bin/harbor-docker stop kube-controller-manager
+ExecStartPre=-/usr/local/bin/harbor-docker kill kube-controller-manager
+ExecStartPre=-/usr/local/bin/harbor-docker rm -v kube-controller-manager
+ExecStartPre=/usr/local/bin/kube-controller-manager
+ExecStart=/usr/local/bin/harbor-docker inspect kube-controller-manager
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

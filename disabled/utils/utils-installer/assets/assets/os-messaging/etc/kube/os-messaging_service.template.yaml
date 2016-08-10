@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{OPENSTACK_COMPONENT}}
+  labels:
+    app: {{OPENSTACK_COMPONENT}}
+spec:
+  ports:
+  - port: 5672
+    protocol: TCP
+  selector:
+    app: {{OPENSTACK_COMPONENT}}-rc

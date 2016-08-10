@@ -1,0 +1,46 @@
+// Login Page
+.login {
+    margin-top: inherit;
+}
+.login-pf #brand {
+  font-size: 36px;
+  text-transform: uppercase;
+  line-height: 0px;
+}
+.login-pf .submit {
+    padding-top: 18px;
+}
+.login-pf svg {
+  fill: #FFF;
+  width: 80%;
+  opacity: 0.05;
+  left: 10%;
+  top: 20%;
+  max-height: 20%;
+  position: fixed;
+}
+.login-pf .status {
+  margin-top: 2em;
+}
+
+
+
+.login-pf body {
+  background: #080808 url("/static/themes/harbor/assets/images/patternfly/bg-login.jpg") no-repeat center center fixed;
+  -webkit-background-size: cover;
+  -moz-background-size: cover;
+  -o-background-size: cover;
+  background-size: cover;
+}
+
+.login-pf .container {
+    background-color: rgba(0, 0, 0, 0.5) !important;
+    padding-top: 128px;
+  }
+
+
+.login-pf  .help_text.alert.alert-info {
+      background-color: rgba(242, 242, 242, 0);
+      border-color: rgba(139, 141, 143, 0);
+      color: #FFF;
+  }

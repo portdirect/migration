@@ -1,0 +1,32 @@
+[Unit]
+Description=Kubernetes Scheduler Plugin
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+After=docker-bootstrap.service
+Requires=docker-bootstrap.service
+
+[Service]
+EnvironmentFile=-/etc/kubernetes/config
+EnvironmentFile=-/etc/kubernetes/scheduler
+EnvironmentFile=-/etc/kubernetes/deploy.env
+
+ExecStartPre=-/bin/docker -H unix:///var/run/docker-bootstrap.sock kill kube-scheduler
+ExecStartPre=-/bin/docker -H unix:///var/run/docker-bootstrap.sock rm kube-scheduler
+ExecStart=/bin/docker -H unix:///var/run/docker-bootstrap.sock run \
+            --net='host' \
+            --name=kube-scheduler \
+            -v /etc/ssl/certs:/etc/ssl/certs \
+            -v /etc/kubernetes/ssl:/etc/kubernetes/ssl \
+            $KUBERNETES_IMAGE /hyperkube scheduler \
+            	    $KUBE_LOGTOSTDERR \
+            	    $KUBE_LOG_LEVEL \
+            	    $KUBE_MASTER \
+            	    $KUBE_SCHEDULER_ARGS
+ExecStop=/bin/docker -H unix:///var/run/docker-bootstrap.sock stop kube-scheduler
+ExecStop=/bin/docker -H unix:///var/run/docker-bootstrap.sock rm kube-scheduler
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+[Unit]
+Description=HarborOS Mounter
+After=etcd.service docker-bootstrap.service
+Requires=docker-bootstrap.service
+
+[Service]
+TimeoutStartSec=300
+Type=oneshot
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock pull registry.harboros.net:3040/harboros/utils-discs:latest
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock stop harbor-mounter
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock kill harbor-mounter
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock rm harbor-mounter
+ExecStart=/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock run \
+                  -v /tmp/harbor:/tmp/harbor \
+                  --name harbor-mounter \
+                  -e SCRIPT=mount \
+                  registry.harboros.net:3040/harboros/utils-discs:latest
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,22 @@
+[Unit]
+Description=Etcd Kube Master
+After=harbor-etcd-bootstrap.service
+Requires=harbor-etcd-bootstrap.service
+
+[Service]
+StandardOutput=null
+TimeoutStartSec=0
+RemainAfterExit=yes
+Type=simple
+
+ExecStartPre=-/usr/local/bin/harbor-docker stop kube-etcd
+ExecStartPre=-/usr/local/bin/harbor-docker kill kube-etcd
+ExecStartPre=-/usr/local/bin/harbor-docker rm -v kube-etcd
+ExecStartPre=/usr/local/bin/etcd-kube-master
+ExecStart=/usr/local/bin/harbor-docker inspect kube-etcd
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

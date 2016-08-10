@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{OPENSTACK_COMPONENT}}-ec2-{{OPENSTACK_SUBCOMPONENT}}
+  labels:
+    app: {{OPENSTACK_COMPONENT}}-ec2-{{OPENSTACK_SUBCOMPONENT}}
+spec:
+  type: NodePort
+  ports:
+  - port: 8773
+    nodePort: 8773
+    name: {{OPENSTACK_COMPONENT}}-ec2-{{OPENSTACK_SUBCOMPONENT}}
+    protocol: TCP
+  selector:
+    app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+  labels:
+    app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+spec:
+  type: NodePort
+  ports:
+  - port: 8774
+    nodePort: 8774
+    name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+    protocol: TCP
+  selector:
+    app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{OPENSTACK_COMPONENT}}-meta
+  labels:
+    app: {{OPENSTACK_COMPONENT}}-meta
+spec:
+  type: NodePort
+  ports:
+  - port: 8775
+    nodePort: 8775
+    name: {{OPENSTACK_COMPONENT}}-meta
+    protocol: TCP
+  selector:
+    app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rc

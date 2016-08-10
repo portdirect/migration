@@ -1,0 +1,29 @@
+[Unit]
+Description=HarborOS: OpenStack: Keystone Manager: Service
+After=docker.service freeipa.service os-database.service os-glusterfs.service
+Requires=docker.service os-glusterfs.service
+
+[Service]
+TimeoutStartSec=0
+EnvironmentFile=/etc/os-common/common.env
+RemainAfterExit=True
+
+
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/var/usrlocal/bin/os-keystone-manager-flight.sh
+ExecStart=/bin/echo 'Keystone Configured'
+ExecStartPost=/usr/local/bin/etcdctl set /${OS_DISTRO}/keystone/status DOWN
+
+ExecStop=/usr/local/bin/etcdctl set /${OS_DISTRO}/keystone/status DOWN
+
+ExecStop=-/bin/kubectl delete -f /etc/os-keystone/kube/os-keystone-manager_replicationcontroller.yaml --namespace=os-keystone
+
+
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=os-keystone-api.service

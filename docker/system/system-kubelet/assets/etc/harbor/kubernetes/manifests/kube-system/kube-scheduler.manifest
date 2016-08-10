@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: kube-scheduler
+    version: v0.1.0
+  name: kube-scheduler
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-scheduler
+    image: docker.io/port/system-hyperkube:latest
+    command:
+      - /hyperkube
+      - scheduler
+      - --master=127.0.0.1:8080
+      - --v=2
+      - --logtostderr=true
+    volumeMounts:
+      - mountPath: /srv/kubernetes
+        name: kube-data
+  volumes:
+    - name: kube-data
+      hostPath:
+        path: /var/lib/harbor/kube

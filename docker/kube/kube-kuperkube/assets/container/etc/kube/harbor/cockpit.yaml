@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    harbor-app: cockpit-dashboard
+    version: v0.1.0
+  name: cockpit-dashboard
+  namespace: harbor-cockpit
+spec:
+  replicas: 1
+  selector:
+    harbor-app: cockpit-dashboard
+    version: v0.1.0
+  template:
+    metadata:
+      labels:
+        harbor-app: cockpit-dashboard
+        version: v0.1.0
+      name: cockpit-dashboard
+      namespace: harbor-cockpit
+    spec:
+      nodeSelector:
+        cockpit: 'true'
+        arch: 'x86'
+      containers:
+        - name: harbor-cockpit
+          image:  docker.io/port/x86-cockpit:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9090
+              protocol: TCP
+              name: https
+          volumeMounts:
+            - name: host
+              mountPath: "/host"
+              readOnly: false
+            - name: kube-ca
+              mountPath: "/etc/ssl/certs/ca-bundle.crt"
+              readOnly: false
+          securityContext:
+            privileged: true
+      hostNetwork: true
+      hostPID: true
+      volumes:
+        - name: host
+          hostPath:
+            path: /
+        - name: kube-ca
+          hostPath:
+            path: /etc/harbor/auth/kubernetes/ca.crt
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    harbor-app: cockpit-dashboard
+  name: cockpit-dashboard
+  namespace: harbor-cockpit
+spec:
+  type: NodePort
+  ports:
+  - port: 9090
+    targetPort: 9090
+    nodePort: 9091
+    name: https
+  selector:
+    harbor-app: cockpit-dashboard

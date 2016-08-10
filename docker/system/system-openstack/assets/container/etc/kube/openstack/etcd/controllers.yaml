@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: etcd
+    version: v0.1.0
+  name: etcd
+  namespace: os-etcd
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: etcd
+        version: v0.1.0
+      name: openstack-etcd
+      namespace: os-etcd
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: openstack-etcd
+          image:  docker.io/port/system-etcd:latest
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: etcd
+              mountPath: '/data'
+              readOnly: false
+          command:
+            - /bin/etcd
+            - --name=os-etcd
+            - --listen-client-urls=http://0.0.0.0:4001
+            - --advertise-client-urls=http://etcd.os-etcd.svc.{{OS_DOMAIN}}:4001
+            - --data-dir=/data
+          ports:
+            - containerPort: 4001
+              name: etcd
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: etcd
+          hostPath:
+            path: /var/lib/harbor/os-etcd

@@ -1,0 +1,6 @@
+/etc/os-common/common.env
+/etc/freeipa/credentials-client-provisioning.env
+/etc/freeipa/credentials-user-provisioning.env
+/etc/freeipa/credentials-admin.env
+/etc/os-proxy/os-proxy.env
+/etc/os-proxy/credentials-os-proxy.env

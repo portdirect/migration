@@ -1,0 +1,1378 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nova-manager
+  namespace: os-nova
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  nova-keystone-user: {{NOVA_KEYSTONE_USER}}
+  nova-keystone-password: {{NOVA_KEYSTONE_PASSWORD}}
+  nova-db-name: {{NOVA_DB_NAME}}
+  nova-db-user: {{NOVA_DB_USER}}
+  nova-db-password: {{NOVA_DB_PASSWORD}}
+  nova-api-db-name: {{NOVA_API_DB_NAME}}
+  neutron-shared-secret: {{NEUTRON_SHARED_SECRET}}
+  neutron-keystone-user: {{NEUTRON_KEYSTONE_USER}}
+  neutron-keystone-password: {{NEUTRON_KEYSTONE_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: nova-manager
+    version: v0.1.0
+  name: nova-manager
+  namespace: os-nova
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: nova-manager
+        version: v0.1.0
+      name: nova-manager
+      namespace: os-nova
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: nova-manager
+          image:  docker.io/port/nova-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: nova-manager
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nova
+  namespace: os-nova
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  nova-keystone-user: {{NOVA_KEYSTONE_USER}}
+  nova-keystone-password: {{NOVA_KEYSTONE_PASSWORD}}
+  nova-db-name: {{NOVA_DB_NAME}}
+  nova-db-user: {{NOVA_DB_USER}}
+  nova-db-password: {{NOVA_DB_PASSWORD}}
+  nova-api-db-name: {{NOVA_API_DB_NAME}}
+  neutron-shared-secret: {{NEUTRON_SHARED_SECRET}}
+  neutron-keystone-user: {{NEUTRON_KEYSTONE_USER}}
+  neutron-keystone-password: {{NEUTRON_KEYSTONE_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: nova
+    version: v0.1.0
+  name: nova
+  namespace: os-nova
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: nova
+        version: v0.1.0
+      name: nova
+      namespace: os-nova
+    spec:
+      nodeSelector:
+        openstack-nova: 'true'
+        arch: 'x86'
+      containers:
+        - name: nova-api
+          image: docker.io/port/nova-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8774
+              name: https
+              protocol: TCP
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+          securityContext:
+            privileged: false
+            capabilities:
+              add:
+                - NET_ADMIN
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: nova
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: os-ssl
+          secret:
+            secretName: nova-ssl-secret
+        - name: os-ssl-ec2
+          secret:
+            secretName: nova-ec2-ssl-secret
+        - name: os-ssl-metadata
+          secret:
+            secretName: nova-metadata-ssl-secret
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: nova
+    version: v0.1.0
+  name: nova-metadata
+  namespace: os-nova
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: nova-metadata
+        version: v0.1.0
+      name: nova-metadata
+      namespace: os-nova
+    spec:
+      nodeSelector:
+        openstack-nova: 'true'
+        arch: 'x86'
+      containers:
+        - name: nova-metadata
+          image: docker.io/port/nova-api-metadata:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8775
+              name: https-metadata
+              protocol: TCP
+            - containerPort: 8776
+              name: http-metadata
+              protocol: TCP
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: os-ssl-metadata
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+          securityContext:
+            privileged: false
+            capabilities:
+              add:
+                - NET_ADMIN
+      restartPolicy: Always
+      volumes:
+      - name: os-config
+        secret:
+          secretName: nova
+      - name: os-ssl-database
+        hostPath:
+          path: /etc/harbor/auth/host/database
+      - name: os-ssl-messaging
+        hostPath:
+          path: /etc/harbor/auth/host/messaging
+      - name: ipa-ca-crt
+        hostPath:
+          path: /etc/ipa/ca.crt
+      - name: os-ssl
+        secret:
+          secretName: nova-ssl-secret
+      - name: os-ssl-ec2
+        secret:
+          secretName: nova-ec2-ssl-secret
+      - name: os-ssl-metadata
+        secret:
+          secretName: nova-metadata-ssl-secret
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: nova-ec2
+    version: v0.1.0
+  name: nova-ec2
+  namespace: os-nova
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: nova-ec2
+        version: v0.1.0
+      name: nova-ec2
+      namespace: os-nova
+    spec:
+      nodeSelector:
+        openstack-nova: 'true'
+        arch: 'x86'
+      containers:
+        - name: nova-ec2
+          image: docker.io/port/nova-api-ec2:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8773
+              name: https-ec2
+              protocol: TCP
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: os-ssl-ec2
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+      - name: os-config
+        secret:
+          secretName: nova
+      - name: os-ssl-database
+        hostPath:
+          path: /etc/harbor/auth/host/database
+      - name: os-ssl-messaging
+        hostPath:
+          path: /etc/harbor/auth/host/messaging
+      - name: ipa-ca-crt
+        hostPath:
+          path: /etc/ipa/ca.crt
+      - name: os-ssl
+        secret:
+          secretName: nova-ssl-secret
+      - name: os-ssl-ec2
+        secret:
+          secretName: nova-ec2-ssl-secret
+      - name: os-ssl-metadata
+        secret:
+          secretName: nova-metadata-ssl-secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nova-scheduler
+  namespace: os-nova
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  nova-keystone-user: {{NOVA_KEYSTONE_USER}}
+  nova-keystone-password: {{NOVA_KEYSTONE_PASSWORD}}
+  nova-db-name: {{NOVA_DB_NAME}}
+  nova-db-user: {{NOVA_DB_USER}}
+  nova-db-password: {{NOVA_DB_PASSWORD}}
+  nova-api-db-name: {{NOVA_API_DB_NAME}}
+  neutron-shared-secret: {{NEUTRON_SHARED_SECRET}}
+  neutron-keystone-user: {{NEUTRON_KEYSTONE_USER}}
+  neutron-keystone-password: {{NEUTRON_KEYSTONE_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: nova-scheduler
+    version: v0.1.0
+  name: nova-scheduler
+  namespace: os-nova
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: nova-scheduler
+        version: v0.1.0
+      name: nova-scheduler
+      namespace: os-nova
+    spec:
+      nodeSelector:
+        openstack-nova: 'true'
+        arch: 'x86'
+      containers:
+        - name: nova-scheduler
+          image: docker.io/port/nova-scheduler:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: nova-scheduler
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nova-conductor
+  namespace: os-nova
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  nova-keystone-user: {{NOVA_KEYSTONE_USER}}
+  nova-keystone-password: {{NOVA_KEYSTONE_PASSWORD}}
+  nova-db-name: {{NOVA_DB_NAME}}
+  nova-db-user: {{NOVA_DB_USER}}
+  nova-db-password: {{NOVA_DB_PASSWORD}}
+  nova-api-db-name: {{NOVA_API_DB_NAME}}
+  neutron-shared-secret: {{NEUTRON_SHARED_SECRET}}
+  neutron-keystone-user: {{NEUTRON_KEYSTONE_USER}}
+  neutron-keystone-password: {{NEUTRON_KEYSTONE_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: nova-conductor
+    version: v0.1.0
+  name: nova-conductor
+  namespace: os-nova
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: nova-conductor
+        version: v0.1.0
+      name: nova-conductor
+      namespace: os-nova
+    spec:
+      nodeSelector:
+        openstack-nova: 'true'
+        arch: 'x86'
+      containers:
+        - name: nova-conductor
+          image: docker.io/port/nova-conductor:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: nova-conductor
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nova-consoleauth
+  namespace: os-nova
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  nova-keystone-user: {{NOVA_KEYSTONE_USER}}
+  nova-keystone-password: {{NOVA_KEYSTONE_PASSWORD}}
+  nova-db-name: {{NOVA_DB_NAME}}
+  nova-db-user: {{NOVA_DB_USER}}
+  nova-db-password: {{NOVA_DB_PASSWORD}}
+  nova-api-db-name: {{NOVA_API_DB_NAME}}
+  neutron-shared-secret: {{NEUTRON_SHARED_SECRET}}
+  neutron-keystone-user: {{NEUTRON_KEYSTONE_USER}}
+  neutron-keystone-password: {{NEUTRON_KEYSTONE_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: nova-consoleauth
+    version: v0.1.0
+  name: nova-consoleauth
+  namespace: os-nova
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: nova-consoleauth
+        version: v0.1.0
+      name: nova-consoleauth
+      namespace: os-nova
+    spec:
+      nodeSelector:
+        openstack-nova: 'true'
+        arch: 'x86'
+      containers:
+        - name: nova-consoleauth
+          image: docker.io/port/nova-consoleauth:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: nova-consoleauth
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nova-novnc
+  namespace: os-nova
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  nova-keystone-user: {{NOVA_KEYSTONE_USER}}
+  nova-keystone-password: {{NOVA_KEYSTONE_PASSWORD}}
+  nova-db-name: {{NOVA_DB_NAME}}
+  nova-db-user: {{NOVA_DB_USER}}
+  nova-db-password: {{NOVA_DB_PASSWORD}}
+  nova-api-db-name: {{NOVA_API_DB_NAME}}
+  neutron-shared-secret: {{NEUTRON_SHARED_SECRET}}
+  neutron-keystone-user: {{NEUTRON_KEYSTONE_USER}}
+  neutron-keystone-password: {{NEUTRON_KEYSTONE_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: nova-novnc
+    version: v0.1.0
+  name: nova-novnc
+  namespace: os-nova
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: nova-novnc
+        version: v0.1.0
+      name: nova-novnc
+      namespace: os-nova
+    spec:
+      nodeSelector:
+        openstack-nova: 'true'
+        arch: 'x86'
+      containers:
+        - name: nova-novnc
+          image: docker.io/port/nova-novncproxy:latest
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 6080
+            name: novnc
+            protocol: TCP
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: nova-novnc
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: os-ssl
+          secret:
+            secretName: novnc-ssl-secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nova-serial
+  namespace: os-nova
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  nova-keystone-user: {{NOVA_KEYSTONE_USER}}
+  nova-keystone-password: {{NOVA_KEYSTONE_PASSWORD}}
+  nova-db-name: {{NOVA_DB_NAME}}
+  nova-db-user: {{NOVA_DB_USER}}
+  nova-db-password: {{NOVA_DB_PASSWORD}}
+  nova-api-db-name: {{NOVA_API_DB_NAME}}
+  neutron-shared-secret: {{NEUTRON_SHARED_SECRET}}
+  neutron-keystone-user: {{NEUTRON_KEYSTONE_USER}}
+  neutron-keystone-password: {{NEUTRON_KEYSTONE_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: nova-serial
+    version: v0.1.0
+  name: nova-serial
+  namespace: os-nova
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: nova-serial
+        version: v0.1.0
+      name: nova-serial
+      namespace: os-nova
+    spec:
+      nodeSelector:
+        openstack-nova: 'true'
+        arch: 'x86'
+      containers:
+        - name: nova-serial
+          image: docker.io/port/nova-serialproxy:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+          - containerPort: 6083
+            name: wss
+            protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: serial-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: nova-serial
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: serial-ssl
+          secret:
+            secretName: serial-ssl-secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nova-spice
+  namespace: os-nova
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  nova-keystone-user: {{NOVA_KEYSTONE_USER}}
+  nova-keystone-password: {{NOVA_KEYSTONE_PASSWORD}}
+  nova-db-name: {{NOVA_DB_NAME}}
+  nova-db-user: {{NOVA_DB_USER}}
+  nova-db-password: {{NOVA_DB_PASSWORD}}
+  nova-api-db-name: {{NOVA_API_DB_NAME}}
+  neutron-shared-secret: {{NEUTRON_SHARED_SECRET}}
+  neutron-keystone-user: {{NEUTRON_KEYSTONE_USER}}
+  neutron-keystone-password: {{NEUTRON_KEYSTONE_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: nova-spice
+    version: v0.1.0
+  name: nova-spice
+  namespace: os-nova
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: nova-spice
+        version: v0.1.0
+      name: nova-spice
+      namespace: os-nova
+    spec:
+      nodeSelector:
+        openstack-nova: 'true'
+        arch: 'x86'
+      containers:
+        - name: nova-spice
+          image: docker.io/port/nova-spicehtml5proxy:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+          - containerPort: 6083
+            name: https
+            protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: spice-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: nova-spice
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: spice-ssl
+          secret:
+            secretName: spice-ssl-secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nova-compute
+  namespace: os-nova
+type: Opaque
+data:
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  nova-keystone-user: {{NOVA_KEYSTONE_USER}}
+  nova-keystone-password: {{NOVA_KEYSTONE_PASSWORD}}
+  nova-db-name: {{NOVA_DB_NAME}}
+  nova-db-user: {{NOVA_DB_USER}}
+  nova-db-password: {{NOVA_DB_PASSWORD}}
+  nova-api-db-name: {{NOVA_API_DB_NAME}}
+  neutron-shared-secret: {{NEUTRON_SHARED_SECRET}}
+  neutron-keystone-user: {{NEUTRON_KEYSTONE_USER}}
+  neutron-keystone-password: {{NEUTRON_KEYSTONE_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: nova-compute
+    version: v0.1.0
+  name: nova-compute
+  namespace: os-nova
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: nova-compute
+        version: v0.1.0
+      name: nova-compute
+      namespace: os-nova
+    spec:
+      nodeSelector:
+        compute-hypervisor: 'libvirt'
+        arch: 'x86'
+      containers:
+        - name: nova-compute
+          image: docker.io/port/nova-compute:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: sys-fs-cgroup
+              mountPath: /sys/fs/cgroup
+              readOnly: false
+            - name: var-run-netns
+              mountPath: /var/run/netns
+              readOnly: false
+            - name: var-run-openvswitch
+              mountPath: /var/run/openvswitch
+              readOnly: false
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: host-dev
+              mountPath: /dev
+              readOnly: false
+            - name: host-run
+              mountPath: /run
+              readOnly: false
+            - name: host-machine-id
+              mountPath: /etc/machine-id
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: pod-var-lib-nova
+              mountPath: /var/lib/nova
+              readOnly: false
+            - name: pod-var-lib-nova-instances
+              mountPath: /var/lib/nova/instances
+              readOnly: false
+            - name: pod-var-lib-nova-mnt
+              mountPath: /var/lib/nova/mnt
+              readOnly: false
+            - name: pod-var-lib-libvirt
+              mountPath: /var/lib/libvirt
+              readOnly: false
+            - name: pod-var-etc-libvirt-qemu
+              mountPath: /etc/libvirt/qemu
+              readOnly: false
+            - name: pod-glusterfs-mounts
+              mountPath: /usr/lib/python2.7/site-packages/mnt
+              readOnly: false
+          securityContext:
+            privileged: true
+        - name: nova-compute-libvirt
+          image: docker.io/port/nova-libvirt:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: sys-fs-cgroup
+              mountPath: /sys/fs/cgroup
+              readOnly: false
+            - name: var-run-netns
+              mountPath: /var/run/netns
+              readOnly: false
+            - name: var-run-openvswitch
+              mountPath: /var/run/openvswitch
+              readOnly: false
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: host-dev
+              mountPath: /dev
+              readOnly: false
+            - name: host-run
+              mountPath: /run
+              readOnly: false
+            - name: host-machine-id
+              mountPath: /etc/machine-id
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: pod-var-lib-nova
+              mountPath: /var/lib/nova
+              readOnly: false
+            - name: pod-var-lib-nova-instances
+              mountPath: /var/lib/nova/instances
+              readOnly: false
+            - name: pod-var-lib-nova-mnt
+              mountPath: /var/lib/nova/mnt
+              readOnly: false
+            - name: pod-var-lib-libvirt
+              mountPath: /var/lib/libvirt
+              readOnly: false
+            - name: pod-var-etc-libvirt-qemu
+              mountPath: /etc/libvirt/qemu
+              readOnly: false
+            - name: pod-glusterfs-mounts
+              mountPath: /usr/lib/python2.7/site-packages/mnt
+              readOnly: false
+          securityContext:
+            privileged: true
+      restartPolicy: Always
+      hostNetwork: true
+      hostPID: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: nova-compute
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: sys-fs-cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+        - name: var-run-netns
+          hostPath:
+            path: /var/run/netns
+        - name: var-run-openvswitch
+          hostPath:
+            path: /var/run/openvswitch
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: host-dev
+          hostPath:
+            path: /dev
+        - name: host-run
+          hostPath:
+            path: /run
+        - name: host-machine-id
+          hostPath:
+            path: /etc/machine-id
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: pod-var-lib-nova
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-lib-nova
+        - name: pod-var-lib-nova-instances
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-lib-nova-instances
+        - name: pod-var-lib-nova-mnt
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-lib-nova-mnt
+        - name: pod-var-lib-libvirt
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-lib-libvirt
+        - name: pod-var-etc-libvirt-qemu
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-etc-libvirt-qemu
+        - name: pod-glusterfs-mounts
+          hostPath:
+            path: /var/lib/harbor/nova/pod-glusterfs-mounts
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: nova-compute-docker
+    version: v0.1.0
+  name: nova-compute-docker
+  namespace: os-nova
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: nova-compute-docker
+        version: v0.1.0
+      name: nova-compute-docker
+      namespace: os-nova
+    spec:
+      nodeSelector:
+        compute-hypervisor: 'docker'
+        arch: 'x86'
+      containers:
+        - name: nova-compute-docker
+          image: docker.io/port/nova-compute-docker:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: var-run-netns
+              mountPath: /var/run/netns
+              readOnly: false
+            - name: var-run-openvswitch
+              mountPath: /var/run/openvswitch
+              readOnly: false
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: host-dev
+              mountPath: /dev
+              readOnly: false
+            - name: host-run
+              mountPath: /run
+              readOnly: false
+            - name: host-machine-id
+              mountPath: /etc/machine-id
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: pod-var-lib-nova
+              mountPath: /var/lib/nova
+              readOnly: false
+            - name: pod-var-lib-nova-instances
+              mountPath: /var/lib/nova/instances
+              readOnly: false
+            - name: pod-var-lib-nova-mnt
+              mountPath: /var/lib/nova/mnt
+              readOnly: false
+            - name: pod-var-lib-docker
+              mountPath: /var/lib/docker
+              readOnly: false
+          securityContext:
+            privileged: true
+      restartPolicy: Always
+      hostNetwork: true
+      hostPID: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: nova-compute
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: var-run-netns
+          hostPath:
+            path: /var/run/netns
+        - name: var-run-openvswitch
+          hostPath:
+            path: /var/run/openvswitch
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: host-dev
+          hostPath:
+            path: /dev
+        - name: host-run
+          hostPath:
+            path: /run
+        - name: host-machine-id
+          hostPath:
+            path: /etc/machine-id
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: pod-var-lib-nova
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-lib-nova
+        - name: pod-var-lib-nova-instances
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-lib-nova-instances
+        - name: pod-var-lib-nova-mnt
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-lib-nova-mnt
+        - name: pod-var-lib-docker
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-lib-docker
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: nova-compute-lxd
+    version: v0.1.0
+  name: nova-compute-lxd
+  namespace: os-nova
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: nova-compute-lxd
+        version: v0.1.0
+      name: nova-compute-docker
+      namespace: os-nova
+    spec:
+      nodeSelector:
+        compute-hypervisor: 'lxd'
+        arch: 'x86'
+      containers:
+        - name: nova-compute-lxd
+          image: docker.io/port/nova-compute-lxd:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: var-run-netns
+              mountPath: /var/run/netns
+              readOnly: false
+            - name: var-run-openvswitch
+              mountPath: /var/run/openvswitch
+              readOnly: false
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: host-dev
+              mountPath: /dev
+              readOnly: false
+            - name: host-run
+              mountPath: /run
+              readOnly: false
+            - name: host-machine-id
+              mountPath: /etc/machine-id
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: pod-var-lib-nova
+              mountPath: /var/lib/nova
+              readOnly: false
+            - name: pod-var-lib-nova-instances
+              mountPath: /var/lib/nova/instances
+              readOnly: false
+            - name: pod-var-lib-lxd
+              mountPath: /var/lib/lxd
+              readOnly: false
+          securityContext:
+            privileged: true
+        - name: nova-lxd
+          image: docker.io/port/nova-lxd:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: var-run-netns
+              mountPath: /var/run/netns
+              readOnly: false
+            - name: var-run-openvswitch
+              mountPath: /var/run/openvswitch
+              readOnly: false
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: host-dev
+              mountPath: /dev
+              readOnly: false
+            - name: host-run
+              mountPath: /run
+              readOnly: false
+            - name: host-machine-id
+              mountPath: /etc/machine-id
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: pod-var-lib-nova
+              mountPath: /var/lib/nova
+              readOnly: false
+            - name: pod-var-lib-nova-instances
+              mountPath: /var/lib/nova/instances
+              readOnly: false
+            - name: pod-var-lib-lxd
+              mountPath: /var/lib/lxd
+              readOnly: false
+          securityContext:
+            privileged: true
+      restartPolicy: Always
+      hostNetwork: true
+      hostPID: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: nova-compute
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: var-run-netns
+          hostPath:
+            path: /var/run/netns
+        - name: var-run-openvswitch
+          hostPath:
+            path: /var/run/openvswitch
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: host-dev
+          hostPath:
+            path: /dev
+        - name: host-run
+          hostPath:
+            path: /run
+        - name: host-machine-id
+          hostPath:
+            path: /etc/machine-id
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: pod-var-lib-nova
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-lib-nova
+        - name: pod-var-lib-nova-instances
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-lib-nova-instances
+        - name: pod-var-lib-lxd
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-lib-lxd

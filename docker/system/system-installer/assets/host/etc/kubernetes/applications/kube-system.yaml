@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-proxy
+  namespace: kube-system
+  labels:
+    harbor-app: kube-proxy
+spec:
+  selector:
+    harbor-app: kube-proxy
+  clusterIP: "None"
+  ports:
+  - port: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-apiserver
+  namespace: kube-system
+  labels:
+    harbor-app: kube-apiserver
+spec:
+  selector:
+    harbor-app: kube-apiserver
+  clusterIP: "None"
+  ports:
+  - port: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-scheduler
+  namespace: kube-system
+  labels:
+    harbor-app: kube-scheduler
+spec:
+  selector:
+    harbor-app: kube-scheduler
+  clusterIP: "None"
+  ports:
+  - port: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-controller-manager
+  namespace: kube-system
+  labels:
+    harbor-app: kube-controller-manager
+spec:
+  selector:
+    harbor-app: kube-controller-manager
+  clusterIP: "None"
+  ports:
+  - port: 1

@@ -1,0 +1,12 @@
+{% load horizon i18n %}
+
+
+{% for component in components %}
+{% if user|has_permissions:component %}
+<li{% if current.slug == component.slug %} class="active"{% endif %}>
+  <a class="nav-item-iconic" href="{{ component.get_absolute_url }}" title="{{ component.name }}" tabindex='1'>
+    <span class="fa fa-truck hicon-{{ component.slug }}"></span>
+  </a>
+</li>
+{% endif %}
+{% endfor %}

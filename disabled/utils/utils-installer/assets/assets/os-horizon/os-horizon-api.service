@@ -1,0 +1,29 @@
+[Unit]
+Description=HarborOS: OpenStack: horizon Service
+After=docker.service freeipa.service os-horizon-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=/var/usrlocal/bin/os-horizon-api-preflight.sh
+
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-horizon/kube/os-horizon-api_service.yaml --namespace=os-horizon
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-horizon/kube/os-horizon-api_replicationcontroller.yaml --namespace=os-horizon
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-horizon/kube/os-horizon_secrets.yaml --namespace=os-horizon
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-horizon/kube/os-horizon_secrets.yaml --namespace=os-horizon
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-horizon/kube/os-horizon-api_replicationcontroller.yaml --namespace=os-horizon
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-horizon/kube/os-horizon-api_service.yaml --namespace=os-horizon
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-horizon/kube/os-horizon-api_service.yaml --namespace=os-horizon
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-horizon/kube/os-horizon-api_replicationcontroller.yaml --namespace=os-horizon
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-horizon/kube/os-horizon_secrets.yaml --namespace=os-horizon
+
+[Install]
+WantedBy=multi-user.target

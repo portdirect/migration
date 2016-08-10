@@ -1,0 +1,311 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: ipsilon-server
+  name: os-ipsilon
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/var/lib/harbor/os-ipsilon/data"
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: ipsilon-server
+  name: os-ipsilon
+  namespace: os-ipsilon
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: ipsilon-db
+  name: os-ipsilon-db
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/var/lib/harbor/os-ipsilon/db"
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: ipsilon-db
+  name: os-ipsilon-db
+  namespace: os-ipsilon
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ipsilon-manager
+  namespace: os-ipsilon
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  ipsilon-root-db-name: {{IPSILON_DB_ROOT_NAME}}
+  ipsilon-root-db-user: {{IPSILON_DB_ROOT_USER}}
+  ipsilon-root-db-password: {{IPSILON_DB_ROOT_PASSWORD}}
+  ipsilon-db-name: {{IPSILON_DB_NAME}}
+  ipsilon-db-user: {{IPSILON_DB_USER}}
+  ipsilon-db-password: {{IPSILON_DB_PASSWORD}}
+  ipsilon-admin-db-name: {{IPSILON_ADMIN_DB_NAME}}
+  ipsilon-admin-db-user: {{IPSILON_ADMIN_DB_USER}}
+  ipsilon-admin-db-password: {{IPSILON_ADMIN_DB_PASSWORD}}
+  ipsilon-users-db-name: {{IPSILON_USERS_DB_NAME}}
+  ipsilon-users-db-user: {{IPSILON_USERS_DB_USER}}
+  ipsilon-users-db-password: {{IPSILON_USERS_DB_PASSWORD}}
+  ipsilon-trans-db-name: {{IPSILON_TRANS_DB_NAME}}
+  ipsilon-trans-db-user: {{IPSILON_TRANS_DB_USER}}
+  ipsilon-trans-db-password: {{IPSILON_TRANS_DB_PASSWORD}}
+  ipsilon-samlsession-db-name: {{IPSILON_SAMLSESSION_DB_NAME}}
+  ipsilon-samlsession-db-user: {{IPSILON_SAMLSESSION_DB_USER}}
+  ipsilon-samlsession-db-password: {{IPSILON_SAMLSESSION_DB_PASSWORD}}
+  ipsilon-saml2session-db-name: {{IPSILON_SAML2SESSION_DB_NAME}}
+  ipsilon-saml2session-db-user: {{IPSILON_SAML2SESSION_DB_USER}}
+  ipsilon-saml2session-db-password: {{IPSILON_SAML2SESSION_DB_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: ipsilon-manager
+    version: v0.1.0
+  name: ipsilon-manager
+  namespace: os-ipsilon
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: ipsilon-manager
+        version: v0.1.0
+      name: ipsilon-manager
+      namespace: os-ipsilon
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: ipsilon-manager
+          image:  docker.io/port/ipsilon-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: ipsilon-manager
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: ipsilon-db
+    version: v0.1.0
+  name: ipsilon-db
+  namespace: os-ipsilon
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: ipsilon-db
+        version: v0.1.0
+      name: ipsilon-db
+      namespace: os-ipsilon
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        openstack-database: 'true'
+        arch: 'x86'
+      containers:
+        - name: os-ipsilon
+          image:  docker.io/port/postgres-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+              protocol: TCP
+              name: psql
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: POSTGRES_PASSWORD
+              value: {{IPSILON_DB_ROOT_PASSWORD_PLAIN}}
+            - name: POSTGRES_USER
+              value: {{IPSILON_DB_ROOT_USER_PLAIN}}
+            - name: POSTGRES_DB
+              value: {{IPSILON_DB_ROOT_NAME_PLAIN}}
+            - name: PGDATA
+              value: /var/lib/pysql
+          volumeMounts:
+            - name: data
+              mountPath: '/var/lib/pysql'
+              readOnly: false
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: os-ipsilon-db
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ipsilon-server
+  namespace: os-ipsilon
+type: Opaque
+data:
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  ipsilon-root-db-name: {{IPSILON_DB_ROOT_NAME}}
+  ipsilon-root-db-user: {{IPSILON_DB_ROOT_USER}}
+  ipsilon-root-db-password: {{IPSILON_DB_ROOT_PASSWORD}}
+  ipsilon-db-name: {{IPSILON_DB_NAME}}
+  ipsilon-db-user: {{IPSILON_DB_USER}}
+  ipsilon-db-password: {{IPSILON_DB_PASSWORD}}
+  ipsilon-admin-db-name: {{IPSILON_ADMIN_DB_NAME}}
+  ipsilon-admin-db-user: {{IPSILON_ADMIN_DB_USER}}
+  ipsilon-admin-db-password: {{IPSILON_ADMIN_DB_PASSWORD}}
+  ipsilon-users-db-name: {{IPSILON_USERS_DB_NAME}}
+  ipsilon-users-db-user: {{IPSILON_USERS_DB_USER}}
+  ipsilon-users-db-password: {{IPSILON_USERS_DB_PASSWORD}}
+  ipsilon-trans-db-name: {{IPSILON_TRANS_DB_NAME}}
+  ipsilon-trans-db-user: {{IPSILON_TRANS_DB_USER}}
+  ipsilon-trans-db-password: {{IPSILON_TRANS_DB_PASSWORD}}
+  ipsilon-samlsession-db-name: {{IPSILON_SAMLSESSION_DB_NAME}}
+  ipsilon-samlsession-db-user: {{IPSILON_SAMLSESSION_DB_USER}}
+  ipsilon-samlsession-db-password: {{IPSILON_SAMLSESSION_DB_PASSWORD}}
+  ipsilon-saml2session-db-name: {{IPSILON_SAML2SESSION_DB_NAME}}
+  ipsilon-saml2session-db-user: {{IPSILON_SAML2SESSION_DB_USER}}
+  ipsilon-saml2session-db-password: {{IPSILON_SAML2SESSION_DB_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: ipsilon-server
+    version: v0.1.0
+  name: ipsilon-server
+  namespace: os-ipsilon
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: ipsilon-server
+        version: v0.1.0
+      name: ipsilon-server
+      namespace: os-ipsilon
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: ipsilon-server
+          image:  docker.io/port/ipsilon-server:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+            - containerPort: 4143
+              name: https
+              protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: data
+              mountPath: '/var/lib/ipsilon'
+              readOnly: false
+          securityContext:
+            privileged: false
+      volumes:
+        - name: os-config
+          secret:
+            secretName: ipsilon-server
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: os-ssl
+          secret:
+            secretName: ipsilon-ssl-secret
+        - name: data
+          persistentVolumeClaim:
+            claimName: os-ipsilon

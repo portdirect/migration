@@ -1,0 +1,25 @@
+[Unit]
+Description=HarborOS: OpenStack: ceilometer Services Service
+After=docker.service freeipa.service os-ceilometer-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=/var/usrlocal/bin/os-ceilometer-services-preflight.sh
+
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-ceilometer/kube/os-ceilometer-services_daemonset.yaml --namespace=os-ceilometer
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-ceilometer/kube/os-ceilometer-services_secrets.yaml --namespace=os-ceilometer
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-ceilometer/kube/os-ceilometer-services_secrets.yaml --namespace=os-ceilometer
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-ceilometer/kube/os-ceilometer-services_daemonset.yaml --namespace=os-ceilometer
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-ceilometer/kube/os-ceilometer-services_daemonset.yaml --namespace=os-ceilometer
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-ceilometer/kube/os-ceilometer-services_secrets.yaml --namespace=os-ceilometer
+
+[Install]
+WantedBy=multi-user.target

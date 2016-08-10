@@ -1,0 +1,2 @@
+
+curl -L http://dl.fedoraproject.org/pub/alt/atomic/stable/Cloud_Atomic/x86_64/os/images/install.img > /var/www/html/installer/images/LiveOS/squashfs.img

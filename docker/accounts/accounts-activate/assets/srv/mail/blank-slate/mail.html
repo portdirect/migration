@@ -1,0 +1,491 @@
+
+<!DOCTYPE html>
+<!--[if IE 9]><html lang="en-us" class="ie9"><![endif]-->
+<!--[if gt IE 9]><!-->
+<html lang="en-us">
+<!--<![endif]-->
+  <head>
+    <!--<link rel="stylesheet" href="https://rawgit.com/patternfly/patternfly/master/dist/css/patternfly.min.css" >-->
+    <!--<link rel="stylesheet" href="https://rawgit.com/patternfly/patternfly/master/dist/css/patternfly-additions.min.css" >-->
+
+
+    <style>
+    /*** uncss> filename: https://rawgit.com/patternfly/patternfly/master/dist/css/patternfly.min.css ***/
+
+body {
+  margin: 0;
+}
+
+.fa {
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 300;
+  src: url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-Light-webfont.eot);
+  src: url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-Light-webfont.eot?#iefix) format('embedded-opentype'),url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-Light-webfont.woff) format('woff'),url(../fonts/OpenSans-Light-webfont.ttf) format('truetype'),url(../fonts/OpenSans-Light-webfont.svg#OpenSansLight) format('svg');
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-Regular-webfont.eot);
+  src: url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-Regular-webfont.eot?#iefix) format('embedded-opentype'),url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-Regular-webfont.woff) format('woff'),url(../fonts/OpenSans-Regular-webfont.ttf) format('truetype'),url(../fonts/OpenSans-Regular-webfont.svg#OpenSansRegular) format('svg');
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 600;
+  src: url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-Semibold-webfont.eot);
+  src: url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-Semibold-webfont.eot?#iefix) format('embedded-opentype'),url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-Semibold-webfont.woff) format('woff'),url(../fonts/OpenSans-Semibold-webfont.ttf) format('truetype'),url(../fonts/OpenSans-Semibold-webfont.svg#OpenSansSemibold) format('svg');
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-Bold-webfont.eot);
+  src: url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-Bold-webfont.eot?#iefix) format('embedded-opentype'),url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-Bold-webfont.woff) format('woff'),url(../fonts/OpenSans-Bold-webfont.ttf) format('truetype'),url(../fonts/OpenSans-Bold-webfont.svg#OpenSansBold) format('svg');
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 800;
+  src: url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-ExtraBold-webfont.eot);
+  src: url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-ExtraBold-webfont.eot?#iefix) format('embedded-opentype'),url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-ExtraBold-webfont.woff) format('woff'),url(https://rawgit.com/patternfly/patternfly/master/dist/fonts/OpenSans-ExtraBold-webfont.ttf) format('truetype'),url(../fonts/OpenSans-ExtraBold-webfont.svg#OpenSansExtrabold) format('svg');
+}
+
+/*!
+ * Bootstrap v3.3.6 (http://getbootstrap.com)
+ * Copyright 2011-2015 Twitter, Inc.
+ * Licensed under MIT (https://github.com/twbs/bootstrap/blob/master/LICENSE)
+ */
+
+/*! normalize.css v3.0.3 | MIT License | github.com/necolas/normalize.css */
+
+html {
+  font-family: sans-serif;
+  -ms-text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+a {
+  background-color: transparent;
+}
+
+a:active,
+a:hover {
+  outline: 0;
+}
+
+h1 {
+  margin: .67em 0;
+}
+
+button::-moz-focus-inner,
+input::-moz-focus-inner {
+  border: 0;
+  padding: 0;
+}
+
+/*! Source: https://github.com/h5bp/html5-boilerplate/blob/master/src/css/main.css */
+
+@media print {
+  *,
+  :after,
+  :before {
+    background: 0 0!important;
+    color: #000!important;
+    box-shadow: none!important;
+    text-shadow: none!important;
+  }
+
+  a,
+  a:visited {
+    text-decoration: underline;
+  }
+
+  a[href]:after {
+    content: " (" attr(href) ")";
+  }
+
+  a[href^="#"]:after {
+    content: "";
+  }
+
+  p {
+    orphans: 3;
+    widows: 3;
+  }
+}
+
+.btn,
+.btn-primary:active,
+.btn:active {
+  background-image: none;
+}
+
+body {
+  background-color: #fff;
+}
+
+
+*,
+:after,
+:before {
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 10px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: "Open Sans",Helvetica,Arial,sans-serif;
+  font-size: 12px;
+  line-height: 1.66666667;
+  color: #333;
+}
+
+a {
+  color: #0099d3;
+  text-decoration: none;
+}
+
+a:focus,
+a:hover {
+  color: #00618a;
+  text-decoration: underline;
+}
+
+a:focus {
+  outline: dotted thin;
+  outline: -webkit-focus-ring-color auto 5px;
+  outline-offset: -2px;
+}
+
+[role=button] {
+  cursor: pointer;
+}
+
+h1 {
+  font-family: inherit;
+  font-weight: 500;
+  line-height: 1.1;
+  color: inherit;
+}
+
+h1 {
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+h1 {
+  font-size: 24px;
+}
+
+p {
+  margin: 0 0 10px;
+}
+
+.page-header {
+  padding-bottom: 9px;
+  margin: 40px 0 20px;
+  border-bottom: 1px solid #eee;
+}
+
+@media (min-width:768px) {
+  .container {
+    width: 760px;
+  }
+}
+
+.container {
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.container {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+@media (min-width:992px) {
+  .container {
+    width: 980px;
+  }
+}
+
+@media (min-width:1200px) {
+  .container {
+    width: 1180px;
+  }
+}
+
+.form-control::-moz-placeholder {
+  opacity: 1;
+  color: #999;
+  font-style: italic;
+}
+
+.form-control:-ms-input-placeholder {
+  color: #999;
+  font-style: italic;
+}
+
+.form-control:-moz-placeholder {
+  color: #999;
+  font-style: italic;
+}
+
+.form-control::-ms-expand {
+  border: 0;
+  background-color: transparent;
+}
+
+.btn {
+  line-height: 1.66666667;
+  white-space: nowrap;
+}
+
+.btn {
+  display: inline-block;
+  margin-bottom: 0;
+  font-weight: 600;
+  text-align: center;
+  vertical-align: middle;
+  touch-action: manipulation;
+  cursor: pointer;
+  border: 1px solid transparent;
+  padding: 2px 6px;
+  font-size: 12px;
+  border-radius: 1px;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.btn:active:focus,
+.btn:focus {
+  outline: dotted thin;
+  outline: -webkit-focus-ring-color auto 5px;
+  outline-offset: -2px;
+}
+
+.btn:focus,
+.btn:hover {
+  color: #4d5258;
+  text-decoration: none;
+}
+
+.btn:active {
+  outline: 0;
+  -webkit-box-shadow: inset 0 3px 5px rgba(0,0,0,.125);
+  box-shadow: inset 0 3px 5px rgba(0,0,0,.125);
+}
+
+.btn-primary:focus {
+  color: #fff;
+  background-color: #00649c;
+  border-color: #00141d;
+}
+
+.btn-primary:active,
+.btn-primary:hover {
+  color: #fff;
+  background-color: #00649c;
+  border-color: #00435f;
+}
+
+.btn-primary:active:focus,
+.btn-primary:active:hover {
+  color: #fff;
+  background-color: #004d78;
+  border-color: #00141d;
+}
+
+.btn-lg {
+  padding: 6px 10px;
+  font-size: 14px;
+  line-height: 1.3333333;
+  border-radius: 1px;
+}
+
+.container:after,
+.container:before {
+  content: " ";
+  display: table;
+}
+
+.container:after {
+  clear: both;
+}
+
+@-ms-viewport {
+  width: device-width;
+}
+
+.fa {
+  display: inline-block;
+}
+
+/*!
+ *  Font Awesome 4.5.0 by @davegandy - http://fontawesome.io - @fontawesome
+ *  License - http://fontawesome.io/license (Font: SIL OFL 1.1, CSS: MIT License)
+ */
+
+
+
+.fa {
+  font: normal normal normal 14px/1 FontAwesome;
+  font-size: inherit;
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+.fa-anchor:before {
+  content: "\f13d";
+}
+
+.btn {
+  -webkit-box-shadow: 0 2px 3px rgba(0,0,0,.1);
+  box-shadow: 0 2px 3px rgba(0,0,0,.1);
+}
+
+.btn:active {
+  -webkit-box-shadow: inset 0 2px 8px rgba(0,0,0,.2);
+  box-shadow: inset 0 2px 8px rgba(0,0,0,.2);
+}
+
+.btn-primary {
+  background-color: #0085cf;
+  background-image: -webkit-linear-gradient(top,#00a8e1 0,#0085cf 100%);
+  background-image: -o-linear-gradient(top,#00a8e1 0,#0085cf 100%);
+  background-image: linear-gradient(to bottom,#00a8e1 0,#0085cf 100%);
+  background-repeat: repeat-x;
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#ff00a8e1', endColorstr='#ff0085cf', GradientType=0);
+  border-color: #006e9c;
+  color: #fff;
+}
+
+.btn-primary:active,
+.btn-primary:focus,
+.btn-primary:hover {
+  background-color: #0085cf;
+  background-image: none;
+  border-color: #006e9c;
+  color: #fff;
+}
+
+.btn-primary:active {
+  background-image: none;
+}
+
+.btn-primary:active:focus,
+.btn-primary:active:hover {
+  background-color: #0075b6;
+  border-color: #005578;
+}
+
+h1 {
+  font-weight: 300;
+}
+
+/*# sourceMappingURL=patternfly.min.css.map */
+
+/*** uncss> filename: https://rawgit.com/patternfly/patternfly/master/dist/css/patternfly-additions.min.css ***/
+
+/*!
+ * Datetimepicker for Bootstrap 3
+ * version : 4.17.37
+ * https://github.com/Eonasdan/bootstrap-datetimepicker/
+ */
+
+.blank-slate-pf {
+  background-color: #f5f5f5;
+  border: 1px solid #e3e3e3;
+  border-radius: 1px;
+  margin-bottom: 20px;
+  padding: 30px;
+  text-align: center;
+}
+
+@media (min-width:768px) {
+  .blank-slate-pf {
+    padding: 60px;
+  }
+}
+
+@media (min-width:992px) {
+  .blank-slate-pf {
+    padding: 90px 120px;
+  }
+}
+
+.blank-slate-pf .blank-slate-pf-icon {
+  color: #999;
+  font-size: 57.6px;
+  line-height: 57.6px;
+}
+
+.blank-slate-pf .blank-slate-pf-main-action {
+  margin-top: 20px;
+}
+
+.combobox-container .combobox::-ms-clear {
+  display: none;
+}
+
+
+.search-pf .has-clear .form-control::-ms-clear {
+  display: none;
+}
+
+/*# sourceMappingURL=patternfly-additions.min.css.map */
+
+</style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="page-header">
+        <h1><span class="fa"><svg width="18" height="18" viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path d="M960 256q0-26-19-45t-45-19-45 19-19 45 19 45 45 19 45-19 19-45zm832 928v352q0 22-20 30-8 2-12 2-13 0-23-9l-93-93q-119 143-318.5 226.5t-429.5 83.5-429.5-83.5-318.5-226.5l-93 93q-9 9-23 9-4 0-12-2-20-8-20-30v-352q0-14 9-23t23-9h352q22 0 30 20 8 19-7 35l-100 100q67 91 189.5 153.5t271.5 82.5v-647h-192q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h192v-163q-58-34-93-92.5t-35-128.5q0-106 75-181t181-75 181 75 75 181q0 70-35 128.5t-93 92.5v163h192q26 0 45 19t19 45v128q0 26-19 45t-45 19h-192v647q149-20 271.5-82.5t189.5-153.5l-100-100q-15-16-7-35 8-20 30-20h352q14 0 23 9t9 23z"/></svg></span>{{ OS_DOMAIN }}</h1>
+      </div>
+<div class="blank-slate-pf">
+  <div class="blank-slate-pf-icon">
+    <span class="fa"><svg width="128" height="128" viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path d="M960 256q0-26-19-45t-45-19-45 19-19 45 19 45 45 19 45-19 19-45zm832 928v352q0 22-20 30-8 2-12 2-13 0-23-9l-93-93q-119 143-318.5 226.5t-429.5 83.5-429.5-83.5-318.5-226.5l-93 93q-9 9-23 9-4 0-12-2-20-8-20-30v-352q0-14 9-23t23-9h352q22 0 30 20 8 19-7 35l-100 100q67 91 189.5 153.5t271.5 82.5v-647h-192q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h192v-163q-58-34-93-92.5t-35-128.5q0-106 75-181t181-75 181 75 75 181q0 70-35 128.5t-93 92.5v163h192q26 0 45 19t19 45v128q0 26-19 45t-45 19h-192v647q149-20 271.5-82.5t189.5-153.5l-100-100q-15-16-7-35 8-20 30-20h352q14 0 23 9t9 23z"/></svg></span>
+  </div>
+  <h1>
+    Welcome to the {{ OS_DOMAIN }} Beta!
+  </h1>
+  <p>
+    Thanks so much for joining us {{ USER }}, your about to discover a simpler way to harness the true power of the cloud!
+  </p>
+  <p>
+  {{ OS_DOMAIN }} is the most flexible IT management platform, allowing you to securely manage and deploy virtual machines, docker containers wherever you want; from Public Clouds and Workstations or IoT devices, {{ OS_DOMAIN }} makes it both easy to look after legacy apps and embrace the latest technology with native support for a range of tools including: Kubernetes, Mesos, Ansible, Puppet, CloudFormation, and OpenStack.
+  </p>
+  <p>
+    In just a few minutes you'll be able to access {{ OS_DOMAIN }} management console, but first we need to get you up and running with a set a password, follow the link bellow to reset it, and you'll be on your way!
+  </p>
+  <p>
+    If you need any support, I'm always here to help you @{{ EMAIL }}.
+  </p>
+
+  <div class="blank-slate-pf-main-action">
+    <a class="btn btn-primary btn-lg" href="#" role="button">Reset Password</a>
+  </div>
+</div>
+
+
+    </div><!-- /container -->
+  </body>
+</html>

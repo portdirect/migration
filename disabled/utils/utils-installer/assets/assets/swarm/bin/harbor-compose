@@ -1,0 +1,7 @@
+#!/bin/bash
+source /etc/swarm/swarm.env
+SWARM_IP=$(ip -f inet -o addr show $SWARM_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+
+export DOCKER_HOST=${SWARM_IP}:2376
+DOCKER_COMPOSE=$(which docker-compose)
+exec ${DOCKER_COMPOSE} $@

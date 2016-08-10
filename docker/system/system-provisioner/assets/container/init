@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# Setting defaults
+OS_DISTRO=HarborOS
+
+
+
+################################################################################
+echo "${OS_DISTRO}: Generating local environment file from secrets_dir"
+################################################################################
+SECRETS_DIR=/etc/os-config
+find $SECRETS_DIR -type f -print -exec sh -c "cat {} | sed  's|\\\n$||g'; echo " \; > /etc/os-container.env
+sed -i '/^\// d' /etc/os-container.env
+
+
+################################################################################
+echo "${OS_DISTRO}: Sourcing local environment variables"
+################################################################################
+source /etc/os-container.env
+
+
+
+################################################################################
+echo "${OS_DISTRO}: Setting up SSH"
+################################################################################
+adduser -D ${HOST_SSH_USER}
+mkdir -p /home/${HOST_SSH_USER}/.ssh
+echo $HOST_SSH_KEY_PRIVATE | base64 -d > /home/${HOST_SSH_USER}/.ssh/id_rsa
+chmod 0600 /home/${HOST_SSH_USER}/.ssh/id_rsa
+
+
+################################################################################
+echo "${OS_DISTRO}: Launching Node MOnitor"
+################################################################################
+exec /bin/node-watcher

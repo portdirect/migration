@@ -1,0 +1,8 @@
+#!/bin/bash
+
+REAL_PATH=$(python -c "import os,sys;print os.path.realpath('$0')")
+cd "$(dirname "$REAL_PATH")/.."
+
+find docker -name Dockerfile -print0 |
+    xargs -0 tools/validate-maintainer.sh || exit 1
+

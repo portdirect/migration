@@ -1,0 +1,5 @@
+[harbor-ovs]
+name=Harbor OVS
+baseurl=http://172.17.0.11/
+enabled=1
+gpgcheck=0

@@ -1,0 +1,25 @@
+vgremove cinder-volumes
+losetup -d /dev/loop0
+
+
+
+
+pvcreate /dev/sdc1 /dev/sdd1 /dev/sde1
+vgcreate cinder-volumes /dev/sdc1 /dev/sdd1 /dev/sde1
+
+DEVICE="/dev/sdc"
+parted -s ${DEVICE} mklabel gpt
+parted -s ${DEVICE} unit mib mkpart primary 1 100%
+parted -s ${DEVICE} set 1 lvm on
+
+
+DEVICE="/dev/sdd"
+parted -s ${DEVICE} mklabel gpt
+parted -s ${DEVICE} unit mib mkpart primary 1 100%
+parted -s ${DEVICE} set 1 lvm on
+
+
+DEVICE="/dev/sde"
+parted -s ${DEVICE} mklabel gpt
+parted -s ${DEVICE} unit mib mkpart primary 1 100%
+parted -s ${DEVICE} set 1 lvm on

@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: undercloud-mariadb
+    version: v0.1.0
+  name: undercloud-mariadb
+  namespace: node-mariadb
+spec:
+  hostNetwork: true
+  containers:
+  - name: undercloud-mariadb
+    image: docker.io/port/undercloud-mariadb:latest
+    ports:
+      - containerPort: 3306
+        hostPort: 3306
+        name: mysql
+    env:
+      - name: EXPOSED_IP
+        value: {{EXPOSED_IP}}
+      - name: DB_ROOT_PASSWORD
+        value: password
+    command:
+      - /start.sh
+    volumeMounts:
+      - mountPath: /var/lib/mysql
+        name: undercloud-mariadb
+  volumes:
+    - name: undercloud-mariadb
+      hostPath:
+        path: "/var/lib/harbor/undercloud/mysql"

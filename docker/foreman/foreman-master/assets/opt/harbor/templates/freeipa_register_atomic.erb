@@ -1,0 +1,81 @@
+<%#
+kind: snippet
+name: freeipa_register
+%>
+# FreeIPA Registration Snippet
+#
+# Optional parameters:
+#
+#   freeipa_server              IPA server
+#
+#   freeipa_sudo                Enable sudoers
+#                               Default: true
+#
+#   freeipa_ssh                 Enable ssh integration
+#                               Default: true
+#
+#   freeipa_automount           Enable automounter
+#                               Default: false
+#
+#   freeipa_automount_location  Location for automounts
+#
+#   freeipa_mkhomedir           Enable automatically making home directories
+#                               Default: true
+#
+#   freeipa_opts                Additional options to pass directly to installer
+#
+<% if @host.operatingsystem.family == 'Redhat' -%>
+  <% if @host.operatingsystem.name == 'Fedora' -%>
+    freeipa_client=freeipa-client
+  <% else -%>
+    freeipa_client=ipa-client
+  <% end -%>
+<% else -%>
+  freeipa_client=freeipa-client
+<% end -%>
+
+
+##
+## IPA Client Installation
+##
+<% if @host.params['freeipa_server'] -%>
+<% domain = @host.params['freeipa_domain'] || @host.realm.name.downcase -%>
+
+freeipa_server="--server <%= @host.params['freeipa_server'] %> --domain <%=domain %>"
+<% end -%>
+
+<% unless @host.param_false? 'freeipa_mkhomedir' %>
+freeipa_mkhomedir="--mkhomedir"
+<% end -%>
+
+<% if @host.param_false? 'freeipa_ssh' %>
+freeipa_ssh="--no-ssh"
+<% end -%>
+
+<% if @host.params['freeipa_opts'] -%>
+freeipa_opts="<%= @host.params['freeipa_opts'] %>"
+<% else -%>
+freeipa_opts="--no-ntp"
+<% end -%>
+
+# One-time password will be requested at install time. Otherwise, $HOST[OTP] is used as a placeholder value.
+/usr/sbin/ipa-client-install \
+    --hostname=\$(hostname -f) \
+    -w '<%= @host.otp || "$HOST[OTP]" %>' \
+    --realm=<%= @host.realm %> \
+    -U \$freeipa_mkhomedir \$freeipa_opts \$freeipa_server \$freeipa_ssh
+
+##
+## Automounter
+##
+
+<% if @host.params['freeipa_automount_location'] -%>
+automount_location="--location <%= @host.params['freeipa_automount_location'] %>"
+<% end -%>
+
+<% if @host.param_true? 'freeipa_automount' -%>
+if [ -f /usr/sbin/ipa-client-automount ]
+then
+  /usr/sbin/ipa-client-automount \$freeipa_server \$automount_location --unattended
+fi
+<% end -%>

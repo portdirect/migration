@@ -1,0 +1,38 @@
+[Unit]
+Description=Kubernetes API Server
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+After=docker-bootstrap.service
+Requires=docker-bootstrap.service
+
+[Service]
+EnvironmentFile=-/etc/kubernetes/config
+EnvironmentFile=-/etc/kubernetes/apiserver
+EnvironmentFile=-/etc/kubernetes/deploy.env
+
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock kill kube-api
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock rm kube-api
+ExecStart=/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock run \
+            --net='host' \
+            --name=kube-api \
+            -v /etc/ssl/certs:/etc/ssl/certs \
+            -v /etc/kubernetes/ssl:/etc/kubernetes/ssl \
+            $KUBERNETES_IMAGE /hyperkube apiserver \
+                  $KUBE_LOGTOSTDERR \
+                  $KUBE_LOG_LEVEL \
+                  $KUBE_ETCD_SERVERS \
+                  $KUBE_API_ADDRESS \
+                  $KUBE_API_PORT \
+                  $KUBELET_PORT \
+                  $KUBE_ALLOW_PRIV \
+                  $KUBE_SERVICE_ADDRESSES \
+                  $KUBE_ADMISSION_CONTROL \
+                  $KUBE_API_ARGS
+ExecStop=/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock stop kube-api
+ExecStop=/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock rm kube-api
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

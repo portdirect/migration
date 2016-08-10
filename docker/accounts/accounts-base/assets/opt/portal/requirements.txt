@@ -1,0 +1,6 @@
+Pillow
+cherrypy
+jinja2
+sqlalchemy
+captcha >= 0.2
+

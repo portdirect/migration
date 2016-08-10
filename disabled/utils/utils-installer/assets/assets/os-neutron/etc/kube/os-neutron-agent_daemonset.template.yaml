@@ -1,0 +1,42 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rc
+      name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+    spec:
+      nodeSelector:
+        neutron-agent: 'true'
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/neutron-agent:{{OS_RELEASE}}
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: var-run-netns
+              mountPath: /var/run/netns
+              readOnly: false
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+          securityContext:
+            privileged: true
+      hostNetwork: true
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret
+        - name: var-run-netns
+          hostPath:
+            path: /var/run/netns
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules

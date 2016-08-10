@@ -1,0 +1,16 @@
+[Unit]
+Description=HarborOS: SkyDNS: IPA: Monitor
+After=etcd.service
+Requires=etcd.service
+
+[Service]
+TimeoutStartSec=0
+TimeoutStopSec=300
+ExecStart=/var/usrlocal/bin/skydns-freeipa-monitor.sh
+ExecStop=/var/usrlocal/bin/skydns-freeipa-stop.sh
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

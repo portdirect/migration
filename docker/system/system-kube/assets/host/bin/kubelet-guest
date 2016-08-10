@@ -1,0 +1,124 @@
+#!/bin/bash
+set -e
+source /etc/kube/kube.env
+: ${OS_DOMAIN:="$(hostname -d)"}
+: ${KUBE_PORT:=6443}
+: ${KUBELET_DEV:=br0}
+: ${KUBELET_PORT:=10250}
+: ${KUBE_MASTER_HOST:="kubernetes.$(hostname -d)"}
+: ${KUBELET_HOSTNAME:="$(hostname --fqdn)"}
+: ${KUBE_DNS_IP:="10.112.0.2"}
+
+KUBELET_IP=$(ip -f inet -o addr show $KUBELET_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+
+
+mkdir -p /etc/harbor/auth/kubelet
+touch /etc/harbor/auth/kubelet/ca.crt
+touch /etc/harbor/auth/kubelet/kubeconfig.yaml
+mkdir -p /etc/harbor/auth/$(hostname -s)
+touch /etc/harbor/auth/$(hostname -s)/$(hostname -s).crt
+touch /etc/harbor/auth/$(hostname -s)/$(hostname -s).key
+
+
+if [ "$(hostname -s)" = "master" ] ; then
+  KUBE_DNS_TEST=freeipa-master
+else
+  KUBE_DNS_TEST=${KUBE_DNS_IP}
+fi
+
+# Testing dns
+dig +time=1 kubernetes.${OS_DOMAIN} @${KUBE_DNS_TEST}
+
+touch /etc/harbor/auth/$(hostname -s)/kubeconfig.yaml
+
+#From the certificates we have generated, we can produce a kubeconfig file that kubernetes components will use to authenticate against the api server:
+
+mkdir -p /etc/harbor/auth/kubelet
+ln -s /etc/harbor/auth/$(hostname -s)/ca.crt /etc/harbor/auth/kubelet/ca.crt
+cat > /etc/harbor/auth/kubelet/kubeconfig.yaml << EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+  user:
+    client-certificate-data: $( cat /etc/harbor/auth/$(hostname -s)/$(hostname -s).crt | base64 --wrap=0)
+    client-key-data: $( cat /etc/harbor/auth/$(hostname -s)/$(hostname -s).key | base64 --wrap=0)
+clusters:
+- name: $(echo $(hostname -d) | tr '.' '-')
+  cluster:
+    certificate-authority-data: $(cat /etc/harbor/auth/$(hostname -s)/ca.crt | base64 --wrap=0)
+contexts:
+- context:
+    cluster: $(echo $(hostname -d) | tr '.' '-')
+    user: kubelet
+  name: service-account-context
+current-context: service-account-context
+EOF
+
+
+SVC_HOST_NAME=$(hostname -s)
+SVC_AUTH_ROOT_HOST=/etc/harbor/auth
+PUPPET_SSL_DIR=/var/lib/puppet/ssl
+
+HOST_SVC_KEY_LOC=${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.key
+HOST_SVC_CRT_LOC=${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.crt
+HOST_SVC_CA_LOC=${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/ca.crt
+
+mkdir -p ${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}
+ln -s ${PUPPET_SSL_DIR}/certs/ca.pem ${HOST_SVC_CA_LOC}
+ln -s ${PUPPET_SSL_DIR}/certs/$(hostname -f).pem ${HOST_SVC_CRT_LOC}
+ln -s ${PUPPET_SSL_DIR}/private_keys/$(hostname -f).pem ${HOST_SVC_KEY_LOC}
+mkdir -p ${SVC_AUTH_ROOT_HOST}/host/messaging
+ln ${HOST_SVC_KEY_LOC} ${SVC_AUTH_ROOT_HOST}/host/messaging/messaging.key
+ln ${HOST_SVC_CRT_LOC} ${SVC_AUTH_ROOT_HOST}/host/messaging/messaging.crt
+ln ${HOST_SVC_CA_LOC} ${SVC_AUTH_ROOT_HOST}/host/messaging/messaging-ca.crt
+mkdir -p ${SVC_AUTH_ROOT_HOST}/host/database
+ln ${HOST_SVC_KEY_LOC} ${SVC_AUTH_ROOT_HOST}/host/database/database.key
+ln ${HOST_SVC_CRT_LOC} ${SVC_AUTH_ROOT_HOST}/host/database/database.crt
+ln ${HOST_SVC_CA_LOC} ${SVC_AUTH_ROOT_HOST}/host/database/database-ca.crt
+
+
+/usr/local/bin/harbor-docker run \
+        --name=kubelet \
+        --net=host \
+        --pid=host \
+        --privileged \
+        -it \
+        --rm \
+        -v /sys:/sys:ro \
+        -v /var/run:/var/run:rw \
+        -v /:/rootfs:ro \
+        -v /dev:/dev \
+        -v /var/lib/docker/:/var/lib/docker:rw \
+        -v /var/lib/kubelet/:/var/lib/kubelet:rw \
+        -v /etc/machine-id:/etc/machine-id:ro \
+        -v /etc/os-release:/etc/os-release:ro \
+        -v /etc/harbor/auth/$(hostname -s)/ca.crt:/etc/ssl/certs/ca-certificates.crt:ro \
+        -v /etc/harbor/auth/$(hostname -s)/kubeconfig.yaml:/etc/harbor/auth/kubelet/kubeconfig.yaml:ro \
+        -v /etc/harbor/auth/$(hostname -s)/$(hostname -s).crt:/etc/harbor/auth/$(hostname -s)/$(hostname -s).crt:ro \
+        -v /etc/harbor/auth/$(hostname -s)/$(hostname -s).key:/etc/harbor/auth/$(hostname -s)/$(hostname -s).key:ro \
+         docker.io/port/system-kube:latest /hyperkube kubelet \
+             --logtostderr=true \
+             --v=2 \
+             --kubeconfig="/etc/harbor/auth/kubelet/kubeconfig.yaml" \
+             --tls-cert-file="/etc/harbor/auth/$(hostname -s)/$(hostname -s).crt" \
+             --tls-private-key-file="/etc/harbor/auth/$(hostname -s)/$(hostname -s).key" \
+             --api-servers=https://kubernetes.$(hostname -d):443 \
+             --address="${KUBELET_IP}" \
+             --port=${KUBELET_PORT} \
+             --hostname_override=${KUBELET_HOSTNAME} \
+             --allow_privileged=true \
+             --cluster-dns=${KUBE_DNS_IP} --cluster-domain=${OS_DOMAIN} \
+             --containerized  \
+             --node-ip="${KUBELET_IP}"
+#            --pod-infra-container-image=docker.io/port/system-pause:latest
+
+
+harbor-docker run \
+        --name=kube-apiserver \
+        --net='host' \
+        -it \
+        --rm \
+        -v /etc/harbor/auth/kubernetes:/etc/harbor/auth/kubernetes \
+        -v /etc/harbor/auth/kubelet:/etc/harbor/auth/kubelet \
+         docker.io/port/system-kube:latest /hyperkube apiserver --help

@@ -1,0 +1,23 @@
+[Unit]
+Description=HarborOS: Kube2sky Service
+After=docker-bootstrap.service
+Requires=docker-bootstrap.service
+
+[Service]
+TimeoutStartSec=0
+
+ExecStartPre=-/bin/docker -H unix:///var/run/docker-bootstrap.sock stop kube2sky
+ExecStartPre=-/bin/docker -H unix:///var/run/docker-bootstrap.sock kill kube2sky
+ExecStartPre=-/bin/docker -H unix:///var/run/docker-bootstrap.sock rm -v kube2sky
+
+ExecStart=/var/usrlocal/bin/kubernetes-skydns-daemon.sh
+
+ExecStop=-/bin/docker -H unix:///var/run/docker-bootstrap.sock stop kube2sky
+ExecStop=-/bin/docker -H unix:///var/run/docker-bootstrap.sock kill kube2sky
+ExecStop=-/bin/docker -H unix:///var/run/docker-bootstrap.sock rm -v kube2sky
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

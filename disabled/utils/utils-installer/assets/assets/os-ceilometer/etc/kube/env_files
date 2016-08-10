@@ -1,0 +1,11 @@
+/etc/os-common/common.env
+/etc/freeipa/credentials-client-provisioning.env
+/etc/freeipa/credentials-user-provisioning.env
+/etc/os-mongodb/os-mongodb.env
+/etc/os-mongodb/credentials-os-mongodb.env
+/etc/os-messaging/os-messaging.env
+/etc/os-messaging/credentials-os-messaging.env
+/etc/os-keystone/os-keystone.env
+/etc/os-keystone/credentials-os-keystone.env
+/etc/os-ceilometer/os-ceilometer.env
+/etc/os-ceilometer/credentials-os-ceilometer.env

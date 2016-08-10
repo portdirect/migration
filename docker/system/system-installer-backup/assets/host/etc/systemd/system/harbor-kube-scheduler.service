@@ -1,0 +1,22 @@
+[Unit]
+Description=Kube Scheduler
+After=harbor-kube-bootstrap.service
+Requires=harbor-kube-bootstrap.service
+
+[Service]
+StandardOutput=null
+TimeoutStartSec=0
+RemainAfterExit=yes
+Type=simple
+
+ExecStartPre=-/usr/local/bin/harbor-docker stop kube-scheduler
+ExecStartPre=-/usr/local/bin/harbor-docker kill kube-scheduler
+ExecStartPre=-/usr/local/bin/harbor-docker rm -v kube-scheduler
+ExecStartPre=/usr/local/bin/kube-scheduler
+ExecStart=/usr/local/bin/harbor-docker inspect kube-scheduler
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

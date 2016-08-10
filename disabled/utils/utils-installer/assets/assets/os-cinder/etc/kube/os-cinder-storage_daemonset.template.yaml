@@ -1,0 +1,91 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rc
+      name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+    spec:
+      nodeSelector:
+        cinder-storage: 'true'
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/cinder-volume:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: lib-modules
+              mountPath: "/lib/modules"
+              readOnly: true
+            - name: dev
+              mountPath: "/dev"
+              readOnly: false
+            - name: cinder-data
+              mountPath: "/opt/data"
+              readOnly: false
+          securityContext:
+            privileged: true
+            capabilities:
+              drop:
+                - ALL
+      hostNetwork: true
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: dev
+          hostPath:
+            path: /dev
+        - name: cinder-data
+          emptyDir:
+            medium: ""
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-backup
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-backup-rc
+      name: {{OPENSTACK_COMPONENT}}-backup
+    spec:
+      nodeSelector:
+        cinder-backup: 'true'
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-backup
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/cinder-backup:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: lib-modules
+              mountPath: "/lib/modules"
+              readOnly: true
+            - name: dev
+              mountPath: "/dev"
+              readOnly: false
+          securityContext:
+            privileged: true
+            capabilities:
+              drop:
+                - ALL
+      hostNetwork: true
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: dev
+          hostPath:
+            path: /dev

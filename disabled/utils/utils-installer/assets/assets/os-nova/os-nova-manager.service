@@ -1,0 +1,27 @@
+[Unit]
+Description=HarborOS: OpenStack: Nova Manager: Service
+After=docker.service freeipa.service os-database.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+EnvironmentFile=/etc/os-common/common.env
+RemainAfterExit=True
+
+
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/var/usrlocal/bin/os-nova-manager-flight.sh
+ExecStart=/bin/echo 'Nova Configured'
+ExecStartPost=/usr/local/bin/etcdctl set /${OS_DISTRO}/os-nova/status DOWN
+
+ExecStop=/usr/local/bin/etcdctl set /${OS_DISTRO}/os-nova/status DOWN
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-nova/kube/os-nova-manager_replicationcontroller.yaml --namespace=os-nova
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=os-nova-api.service

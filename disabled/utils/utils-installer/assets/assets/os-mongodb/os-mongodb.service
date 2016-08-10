@@ -1,0 +1,44 @@
+[Unit]
+Description=HarborOS: OpenStack: DataBases Service
+After=docker.service freeipa.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+
+ExecStartPre=/var/usrlocal/bin/os-mongodb-preflight.sh
+
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-mongodb/kube/os-mongodb_service.yaml --namespace=os-mongodb
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-mongodb/kube/os-mongodb_daemonset.yaml --namespace=os-mongodb
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-mongodb/kube/os-mongodb_secrets.yaml --namespace=os-mongodb
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-mongodb/kube/os-mongodb_volume_claim.yaml --namespace=os-mongodb
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-mongodb/kube/os-mongodb_volume_definition.yaml --namespace=os-mongodb
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-mongodb
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-mongodb
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=-/usr/local/bin/kubectl create -f /etc/os-mongodb/kube/os-mongodb_namespace.yaml
+#ExecStartPre=-/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-mongodb
+#ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-mongodb
+#ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-mongodb/kube/os-mongodb_volume_definition.yaml --namespace=os-mongodb
+#ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-mongodb/kube/os-mongodb_volume_claim.yaml --namespace=os-mongodb
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-mongodb/kube/os-mongodb_secrets.yaml --namespace=os-mongodb
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-mongodb/kube/os-mongodb_daemonset.yaml --namespace=os-mongodb
+
+ExecStartPost=-/usr/local/bin/kubectl create -f /etc/os-mongodb/kube/os-mongodb_service.yaml --namespace=os-mongodb
+
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-mongodb/kube/os-mongodb_service.yaml --namespace=os-mongodb
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-mongodb/kube/os-mongodb_daemonset.yaml --namespace=os-mongodb
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-mongodb/kube/os-mongodb_secrets.yaml --namespace=os-mongodb
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-mongodb/kube/os-mongodb_volume_claim.yaml --namespace=os-mongodb
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-mongodb/kube/os-mongodb_volume_definition.yaml --namespace=os-mongodb
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-mongodb
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-mongodb
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

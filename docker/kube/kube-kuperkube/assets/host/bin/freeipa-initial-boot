@@ -1,0 +1,70 @@
+
+
+
+
+IPA_PASSWORD=Password123
+ADMIN_PASSWORD=${IPA_PASSWORD}
+DS_PASSWORD=${IPA_PASSWORD}
+DNS_FOWARDER=8.8.8.8
+
+IPA_DATA_DIR=/var/lib/freeipa-master
+
+: ${OS_DOMAIN:="$(hostname -d)"}
+
+
+
+
+################################################################################
+echo "${OS_DISTRO}: Setting Up IPA Server"
+################################################################################
+mkdir -p ${IPA_DATA_DIR}
+cat > $IPA_DATA_DIR/ipa-server-install-options << EOF
+--ds-password=${DS_PASSWORD}
+--admin-password=${ADMIN_PASSWORD}
+EOF
+
+
+OS_HOSTNAME_SHORT=freeipa-master
+################################################################################
+echo "${OS_DISTRO}: Removing Up any Old Servers"
+################################################################################
+docker rm -v ${OS_HOSTNAME_SHORT} || echo "Did not remove an IPA server"
+
+
+################################################################################
+echo "${OS_DISTRO}: Starting IPA Server"
+################################################################################
+MASTER_IPA=$(docker run -d \
+ --hostname=${OS_HOSTNAME_SHORT}.${OS_DOMAIN} \
+ --name=${OS_HOSTNAME_SHORT} \
+ -v ${IPA_DATA_DIR}:/data \
+ -v /var/run \
+ -v /sys/fs/cgroup \
+ --dns=${DNS_FOWARDER} \
+ -e FORWARDER=${DNS_FOWARDER} \
+ -e OS_DOMAIN=${OS_DOMAIN} \
+  docker.io/port/x86-freeipa:latest)
+
+################################################################################
+echo "${OS_DISTRO}: Tailing Logs, once the server has full configured and started the go loop you may use control-c to exit"
+################################################################################
+docker logs -f ${MASTER_IPA}
+MASTER_IPA_IP=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' ${MASTER_IPA})
+
+
+docker stop freeipa-master
+docker rm freeipa-master
+
+
+
+harbor-docker stop  freeipa-master
+
+ACTION=restart
+(
+systemctl ${ACTION} harbor-kube-bootstrap
+systemctl ${ACTION} harbor-kube-apiserver
+systemctl ${ACTION} harbor-kube-scheduler
+systemctl ${ACTION} harbor-kube-controller-manager
+systemctl ${ACTION} harbor-kubelet
+systemctl ${ACTION} harbor-kube-proxy
+)

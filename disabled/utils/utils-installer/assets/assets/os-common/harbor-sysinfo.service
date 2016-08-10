@@ -1,0 +1,18 @@
+[Unit]
+Description=HarborOS Sysinfo Reporter
+After=etcd.service docker-bootstrap.service
+Requires=etcd.service docker-bootstrap.service
+
+[Service]
+TimeoutStartSec=300
+RemainAfterExit=true
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock pull registry.harboros.net:3040/harboros/utils-discs:latest
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock rm harbor-reporter
+ExecStart=/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock run --net=host \
+                  -v /dev:/dev \
+                  -v /tmp/harbor:/tmp/harbor \
+                  --name harbor-reporter \
+                  docker.io/harboros/utils-discs:latest /opt/harbor/reporter
+Restart=on-failure
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,27 @@
+[Unit]
+Description=HarborOS: OpenStack: Glance Manager: Service
+After=docker.service freeipa.service os-database.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+EnvironmentFile=/etc/os-common/common.env
+RemainAfterExit=True
+
+
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/var/usrlocal/bin/os-glance-manager-flight.sh
+ExecStart=/bin/echo 'Glance Configured'
+ExecStartPost=/usr/local/bin/etcdctl set /${OS_DISTRO}/glance/status DOWN
+
+ExecStop=/usr/local/bin/etcdctl set /${OS_DISTRO}/glance/status DOWN
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glance/kube/os-glance-manager_replicationcontroller.yaml --namespace=os-glance
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=os-glance-api.service

@@ -1,0 +1,27 @@
+[Unit]
+Description=HarborOS: OpenStack: heat Manager: Service
+After=docker.service freeipa.service os-database.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+EnvironmentFile=/etc/os-common/common.env
+RemainAfterExit=True
+
+
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/var/usrlocal/bin/os-heat-manager-flight.sh
+ExecStart=/bin/echo 'heat Configured'
+ExecStartPost=/usr/local/bin/etcdctl set /${OS_DISTRO}/heat/status DOWN
+
+ExecStop=/usr/local/bin/etcdctl set /${OS_DISTRO}/heat/status DOWN
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-heat/kube/os-heat-manager_replicationcontroller.yaml --namespace=os-heat
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=os-heat-api.service

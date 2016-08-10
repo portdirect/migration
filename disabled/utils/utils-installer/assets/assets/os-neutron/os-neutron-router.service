@@ -1,0 +1,26 @@
+[Unit]
+Description=HarborOS: OpenStack: neutron Service
+After=docker.service freeipa.service os-neutron-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=-/usr/bin/docker kill neutron-skydns
+ExecStartPre=-/usr/bin/docker kill neutron-router
+ExecStartPre=-/usr/bin/docker rm neutron-skydns
+ExecStartPre=-/usr/bin/docker rm neutron-router
+ExecStartPre=-/usr/bin/docker pull registry.harboros.net:3040/harboros/neutron-router:latest
+ExecStartPre=-/usr/bin/docker pull registry.harboros.net:3040/harboros/neutron-skydns:latest
+ExecStartPre=/var/usrlocal/bin/os-neutron-router-flight.sh
+ExecStartPre=/usr/bin/docker logs neutron-router
+ExecStart=/usr/bin/docker logs -f neutron-skydns
+ExecStop=/usr/bin/docker stop neutron-skydns
+ExecStop=/usr/bin/docker stop neutron-router
+
+
+[Install]
+WantedBy=multi-user.target

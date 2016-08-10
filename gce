@@ -1,0 +1,28 @@
+MASTER_UUID=$(uuidgen -r)
+cat > ./user-data.yaml <<EOF
+#cloud-config
+hostname: node-${MASTER_UUID}
+fqdn: node-${MASTER_UUID}.port.direct
+ssh_pwauth: False
+ssh_authorized_keys:
+  - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC0Tp8A6qDujVlA+sFSiMEqdRxXH+1MEgu2quV2IqlpnegbGIBoWQmKW0p0PyyKTPNs6iuUtMObLhz/e1M8Aqr05omALkfu4Bwjc+eJ/XynzIcr4a4RCWlFd9MBboDMU7zw8au5Qru31yGWHdtA7YqA9DfCoXK8ML4e1AZUIPNvCy3RemqGaduJrwxK9Hum6PlaUzxnaUpOXVnXL58tnWkgAGlZ9Bn+tUNby7CBTKrupQrySunNhWl1CCaCbbsXr5I0/HcGftYLgX7NZCJpB7OgTVJ1OTU5fBOQXSsmREkNPYhlM5DMFHralK9JdNygbCt6Uac/2ITbiQGfB784EbFX harbor@pro.harbor.net
+EOF
+
+
+
+gcloud compute --project "portdirect-1" disks create "disk-${MASTER_UUID}" --size "64" --zone "europe-west1-c" --description "node-${MASTER_UUID} storage" --type "pd-ssd"
+
+gcloud compute --project "portdirect-1" \
+instances create "node-${MASTER_UUID}" \
+--zone "europe-west1-c" \
+--machine-type "n1-highmem-2" \
+--subnet "default" \
+--can-ip-forward \
+--metadata-from-file user-data=$(pwd)/user-data.yaml \
+--maintenance-policy "MIGRATE" \
+--image "/portdirect-1/harbor-host" \
+--boot-disk-size "32" \
+--boot-disk-type "pd-standard" \
+--boot-disk-device-name "instance-1" \
+--disk "name=disk-${MASTER_UUID},device-name=disk-${MASTER_UUID},mode=rw,boot=no" \
+--no-scopes

@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: swarm-manager
+    version: v0.1.0
+  name: swarm-manager
+  namespace: swarm-manager
+spec:
+  hostNetwork: true
+  containers:
+  - name: swarm-manager
+    image: docker.io/port/system-swarm:latest
+    command:
+      - /swarm
+      - manage
+      - -H
+      - unix:///var/run/swarm/docker.sock
+      - etcd://{{ETCD_SERVICE_HOST}}:4001
+    volumeMounts:
+      - mountPath: /var/run/swarm
+        name: swarm-socket
+  volumes:
+    - name: swarm-socket
+      hostPath:
+        path: /var/run/swarm

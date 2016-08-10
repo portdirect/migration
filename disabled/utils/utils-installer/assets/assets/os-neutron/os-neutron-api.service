@@ -1,0 +1,29 @@
+[Unit]
+Description=HarborOS: OpenStack: neutron Service
+After=docker.service freeipa.service os-neutron-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=/var/usrlocal/bin/os-neutron-api-preflight.sh
+
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-neutron/kube/os-neutron-api_service.yaml --namespace=os-neutron
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-neutron/kube/os-neutron-api_replicationcontroller.yaml --namespace=os-neutron
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-neutron/kube/os-neutron_secrets.yaml --namespace=os-neutron
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-neutron/kube/os-neutron_secrets.yaml --namespace=os-neutron
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-neutron/kube/os-neutron-api_replicationcontroller.yaml --namespace=os-neutron
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-neutron/kube/os-neutron-api_service.yaml --namespace=os-neutron
+
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-neutron/kube/os-neutron-api_service.yaml --namespace=os-neutron
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-neutron/kube/os-neutron-api_replicationcontroller.yaml --namespace=os-neutron
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-neutron/kube/os-neutron_secrets.yaml --namespace=os-neutron
+
+[Install]
+WantedBy=multi-user.target

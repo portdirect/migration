@@ -1,0 +1,71 @@
+#!/bin/bash
+set -e
+(
+################################################################################
+echo "HarborOS (c) 2015 Pete Birley"
+################################################################################
+)
+
+: ${OS_DOMAIN:="kube.local"}
+
+if [ "${SECURE_CONFIG}" == "True" ] ; then
+  ################################################################################
+  echo "${OS_DISTRO}: Generating local environment file from secrets_dir"
+  ################################################################################
+  SECRETS_DIR=/etc/os-config
+  find $SECRETS_DIR -type f -printf "\n#%p\n" -exec bash -c "cat {} | sed  's|\\\n$||g'" \; > /etc/os-container.env
+fi
+
+if [ "${SECURE_CONFIG}" == "True" ] ; then
+  ################################################################################
+  echo "${OS_DISTRO}: Sourcing local environment variables"
+  ################################################################################
+  source /etc/os-container.env
+fi
+
+
+
+
+
+
+################################################################################
+echo "${OS_DISTRO}: Sourcing Common Config"
+################################################################################
+. /opt/harbor/service_hosts.sh
+. /opt/harbor/harbor-common.sh
+
+
+################################################################################
+echo "${OS_DISTRO}: Checking Service Dependencies"
+################################################################################
+if [ "${INIT_DB_REQUIRED}" == "True" ] ; then
+  fail_unless_db
+fi
+if [ "${INIT_KEYSTONE_REQUIRED}" == "True" ] ; then
+  fail_unless_os_service_running keystone
+fi
+if [ "${INIT_GLANCE_REQUIRED}" == "True" ] ; then
+  fail_unless_os_service_running glance
+fi
+if [ "${INIT_NOVA_REQUIRED}" == "True" ] ; then
+  fail_unless_os_service_running nova
+fi
+if [ "${INIT_NEUTRON_REQUIRED}" == "True" ] ; then
+  fail_unless_os_service_running neutron
+fi
+
+
+if [ "${IPA_BACKED}" == "True" ] ; then
+  ################################################################################
+  echo "${OS_DISTRO}: IPA Backed: registering Container"
+  ################################################################################
+  trap 'ipa-client-install --uninstall --unattended' EXIT SIGTERM
+  /init-ipa.sh &
+  wait $!
+
+else
+  ################################################################################
+  echo "${OS_DISTRO}: Starting Container"
+  ################################################################################
+  exec /start.sh
+fi

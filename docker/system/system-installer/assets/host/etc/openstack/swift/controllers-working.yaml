@@ -1,0 +1,231 @@
+# kind: PersistentVolume
+# apiVersion: v1
+# metadata:
+#   labels:
+#     openstack-app: os-swift
+#   name: os-swift
+# spec:
+#   capacity:
+#     storage: 1Gi
+#   accessModes:
+#     - ReadWriteMany
+#   nfs:
+#     server: glusterfs.{{OS_DOMAIN}}
+#     path: "/os-swift"
+# ---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: os-swift
+  name: os-swift
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  glusterfs:
+    endpoints: gluster-fs
+    path: os-swift
+    readOnly: false
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: os-swift
+  name: os-swift
+  namespace: os-swift
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: swift-manager
+  namespace: os-swift
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  core-etcd-endpoint: {{CORE_ETCD_ENDPOINT}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  swift-keystone-user: {{SWIFT_KEYSTONE_USER}}
+  swift-keystone-password: {{SWIFT_KEYSTONE_PASSWORD}}
+  swift-device: {{SWIFT_DEVICE}}
+  swift-ring-part-power: {{SWIFT_RING_PART_POWER}}
+  swift-ring-replicas: {{SWIFT_RING_REPLICAS}}
+  swift-ring-min-part-hours: {{SWIFT_RING_MIN_PART_HOURS}}
+  swift-hash-path-prefix: {{SWIFT_HASH_PATH_SUFFIX}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: swift-manager
+    version: v0.1.0
+  name: swift-manager
+  namespace: os-swift
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: swift-manager
+        version: v0.1.0
+      name: swift-manager
+      namespace: os-swift
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: swift-manager
+          image:  docker.io/port/swift-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-swift
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: swift-manager
+        - name: os-swift
+          persistentVolumeClaim:
+            claimName: os-swift
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: swift
+  namespace: os-swift
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  swift-keystone-user: {{SWIFT_KEYSTONE_USER}}
+  swift-keystone-password: {{SWIFT_KEYSTONE_PASSWORD}}
+  swift-device: {{SWIFT_DEVICE}}
+  swift-hash-path-prefix: {{SWIFT_HASH_PATH_SUFFIX}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: swift
+    version: v0.1.0
+  name: swift
+  namespace: os-swift
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: swift
+        version: v0.1.0
+      name: swift
+      namespace: os-swift
+    spec:
+      nodeSelector:
+        openstack-swift: 'true'
+        arch: 'x86'
+      containers:
+        - name: swift-proxy
+          image: docker.io/port/swift-on-file:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+          - containerPort: 8088
+            name: https
+            protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: os-swift
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: proxy-signing-cache
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: swift-proxy-memcached
+          image: docker.io/port/system-memcached:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "0.1"
+            limits:
+              memory: "64Mi"
+              cpu: "0.2"
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: swift
+        - name: os-ssl
+          secret:
+            secretName: swift-ssl-secret
+        - name: os-swift
+          persistentVolumeClaim:
+            claimName: os-swift
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: proxy-signing-cache
+          emptyDir: {}

@@ -1,0 +1,32 @@
+[Unit]
+Description=OpenVSwitch
+After=network.target docker-bootstrap.service
+Before=docker.service
+Requires=etcd.service docker-bootstrap.service
+
+[Service]
+StandardOutput=null
+TimeoutStartSec=0
+RemainAfterExit=yes
+Type=simple
+ExecStartPre=-/usr/sbin/modprobe openvswitch
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock pull docker.io/harboros/ovs:latest
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock stop ovs
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock kill ovs
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock rm ovs
+ExecStart=/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock run \
+              --name ovs \
+              --restart=always \
+              -d \
+              --net=host \
+              --privileged \
+              --cap-add NET_ADMIN \
+              -v /dev/net:/dev/net \
+              -v /var/run/openvswitch:/usr/local/var/run/openvswitch \
+              docker.io/harboros/ovs:latest
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

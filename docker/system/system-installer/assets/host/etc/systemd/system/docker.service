@@ -1,0 +1,19 @@
+[Unit]
+Description=Docker Application Container Engine
+Documentation=https://docs.docker.com
+After=network-online.target cloud-init.service chronyd.service flannel.service docker-wan.service
+Requires=flannel.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/docker-daemon
+MountFlags=slave
+LimitNOFILE=1048576
+LimitNPROC=1048576
+LimitCORE=infinity
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

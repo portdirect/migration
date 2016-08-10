@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: ceilometer
+  name: os-ceilometer
+  namespace: os-ceilometer
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    targetPort: 8777
+    protocol: TCP
+    name: https
+  selector:
+    openstack-app: ceilometer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: ceilometer-central
+  name: ceilometer-central
+  namespace: os-ceilometer
+spec:
+  clusterIP: 'None'
+  ports:
+  - port: 1
+  selector:
+    openstack-app: ceilometer-central
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: ceilometer-collector
+  name: ceilometer-collector
+  namespace: os-ceilometer
+spec:
+  clusterIP: 'None'
+  ports:
+  - port: 1
+  selector:
+    openstack-app: ceilometer-collector
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: ceilometer-notification
+  name: ceilometer-notification
+  namespace: os-ceilometer
+spec:
+  clusterIP: 'None'
+  ports:
+  - port: 1
+  selector:
+    openstack-app: ceilometer-notification
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: ceilometer-alarm-notifier
+  name: ceilometer-notifier
+  namespace: os-ceilometer
+spec:
+  clusterIP: 'None'
+  ports:
+  - port: 1
+  selector:
+    openstack-app: ceilometer-alarm-notifier
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: ceilometer-alarm-evaluator
+  name: ceilometer-evaluator
+  namespace: os-ceilometer
+spec:
+  clusterIP: 'None'
+  ports:
+  - port: 1
+  selector:
+    openstack-app: ceilometer-alarm-evaluator
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: ceilometer-compute
+  name: ceilometer-compute
+  namespace: os-ceilometer
+spec:
+  clusterIP: 'None'
+  ports:
+  - port: 1
+  selector:
+    openstack-app: ceilometer-compute

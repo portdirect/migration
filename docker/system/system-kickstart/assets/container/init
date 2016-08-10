@@ -1,0 +1,44 @@
+#!/bin/sh
+set -e
+
+################################################################################
+echo "${OS_DISTRO}: Generating local environment file from secrets_dir"
+################################################################################
+SECRETS_DIR=/etc/os-config
+find $SECRETS_DIR -type f -print -exec sh -c "cat {} | sed  's|\\\n$||g'; echo " \; > /etc/os-container.env
+sed -i '/^\// d' /etc/os-container.env
+
+
+################################################################################
+echo "${OS_DISTRO}: Sourcing local environment variables"
+################################################################################
+source /etc/os-container.env
+
+# Setting defaults
+OS_DISTRO=HarborOS
+: ${PXE_HTTP_PORT:=79}
+
+
+################################################################################
+echo "${OS_DISTRO}: Setting PORT"
+################################################################################
+sed -i "s,{{PXE_HTTP_PORT}},${PXE_HTTP_PORT},g" /etc/nginx/nginx.conf
+
+
+################################################################################
+echo "${OS_DISTRO}: Setting up Kickstarts"
+################################################################################
+sed -i "s,{{HOST_SSH_USER}},${HOST_SSH_USER},g" /usr/share/nginx/html/node.ks
+
+echo $HOST_SSH_KEY | base64 -d > /tmp/key.pub
+sed -i -e '/{{HOST_SSH_KEY}}/{r /tmp/key.pub' -e 'd}' /usr/share/nginx/html/node.ks
+rm -f /tmp/key.pub
+
+
+################################################################################
+echo "${OS_DISTRO}: Launching Nginx"
+################################################################################
+mkdir -p /var/log/nginx
+touch /var/log/nginx/access.log
+tail -f  /var/log/nginx/access.log &
+exec nginx -g "daemon off;"

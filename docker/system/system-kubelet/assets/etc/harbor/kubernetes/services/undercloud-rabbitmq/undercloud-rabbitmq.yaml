@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    harbor-app: undercloud-rabbitmq
+    version: v0.1.0
+  name: undercloud-rabbitmq
+  namespace: node-rabbitmq
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 5672
+    targetPort: 5672
+    protocol: TCP
+    name: rabbitmq
+  selector:
+    harbor-app: undercloud-rabbitmq

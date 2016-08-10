@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd-docker
+  namespace: docker-system
+  labels:
+    harbor-app: etcd-docker
+spec:
+  selector:
+    harbor-app: etcd-docker
+  clusterIP: 10.100.0.5
+  type: NodePort
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 4003
+    targetPort: 403
+    nodePort: 4003
+    protocol: TCP
+    name: https

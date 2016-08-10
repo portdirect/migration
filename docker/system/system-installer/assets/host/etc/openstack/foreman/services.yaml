@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: foreman-master
+  name: os-foreman
+  namespace: os-foreman
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    targetPort: 44339
+    protocol: TCP
+    name: https
+  selector:
+    openstack-app: foreman-master

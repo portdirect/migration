@@ -1,0 +1,67 @@
+#!/bin/bash
+set -e
+source /etc/kube/kube.env
+: ${OS_DOMAIN:="$(hostname -d)"}
+: ${KUBE_PORT:=6443}
+: ${KUBELET_DEV:=br0}
+: ${KUBELET_PORT:=10250}
+: ${KUBE_MASTER_HOST:="kubernetes.$(hostname -d)"}
+: ${KUBELET_HOSTNAME:="$(hostname --fqdn)"}
+: ${KUBE_DNS_IP:="10.112.0.2"}
+
+KUBELET_IP=$(ip -f inet -o addr show $KUBELET_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+
+
+mkdir -p /etc/harbor/auth/kubelet
+touch /etc/harbor/auth/kubelet/ca.crt
+touch /etc/harbor/auth/kubelet/kubeconfig.yaml
+mkdir -p /etc/harbor/auth/$(hostname -s)
+touch /etc/harbor/auth/$(hostname -s)/$(hostname -s).crt
+touch /etc/harbor/auth/$(hostname -s)/$(hostname -s).key
+
+
+if [ "$(hostname -s)" = "master" ] ; then
+  KUBE_DNS_TEST=freeipa-master
+else
+  KUBE_DNS_TEST=${KUBE_DNS_IP}
+fi
+KUBE_DNS_TEST=freeipa-master
+# Testing dns
+dig +time=1 kubernetes.${OS_DOMAIN} @${KUBE_DNS_TEST}
+
+
+
+
+exec /usr/local/bin/harbor-docker run \
+        --name=kubelet \
+        --net=host \
+        --pid=host \
+        --privileged \
+        --restart=always \
+        -d \
+        -v /sys:/sys:ro \
+        -v /var/run:/var/run:rw \
+        -v /:/rootfs:ro \
+        -v /dev:/dev \
+        -v /var/lib/docker/:/var/lib/docker:rw \
+        -v /var/lib/kubelet/:/var/lib/kubelet:rw \
+        -v /etc/machine-id:/etc/machine-id:ro \
+        -v /etc/os-release:/etc/os-release:ro \
+        -v /etc/harbor/auth/kubelet/ca.crt:/etc/ssl/certs/ca-certificates.crt:ro \
+        -v /etc/harbor/auth/kubelet/kubeconfig.yaml:/etc/harbor/auth/kubelet/kubeconfig.yaml:ro \
+        -v /etc/harbor/auth/host:/etc/harbor/auth/host:ro \
+         docker.io/port/system-kube:latest /hyperkube kubelet \
+             --logtostderr=true \
+             --v=2 \
+             --kubeconfig="/etc/harbor/auth/kubelet/kubeconfig.yaml" \
+             --tls-cert-file="/etc/harbor/auth/host/host.crt" \
+             --tls-private-key-file="/etc/harbor/auth/host/host.key" \
+             --api_servers=https://${KUBE_MASTER_HOST}:${KUBE_PORT} \
+             --address="${KUBELET_IP}" \
+             --port=${KUBELET_PORT} \
+             --hostname_override=${KUBELET_HOSTNAME} \
+             --allow_privileged=true \
+             --cluster-dns=${KUBE_DNS_IP} --cluster-domain=${OS_DOMAIN} \
+             --containerized  \
+             --node-ip="${KUBELET_IP}"
+#            --pod-infra-container-image=docker.io/port/system-pause:latest

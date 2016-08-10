@@ -1,0 +1,322 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: os-glance
+  name: os-glance
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: glusterfs.{{OS_DOMAIN}}
+    path: /os-glance
+    readOnly: false
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: os-glance
+  name: os-glance
+  namespace: os-glance
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: glance-manager
+  namespace: os-glance
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  glance-keystone-user: {{GLANCE_KEYSTONE_USER}}
+  glance-keystone-password: {{GLANCE_KEYSTONE_PASSWORD}}
+  glance-db-name: {{GLANCE_DB_NAME}}
+  glance-db-user: {{GLANCE_DB_USER}}
+  glance-db-password: {{GLANCE_DB_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: glance-manager
+    version: v0.1.0
+  name: glance-manager
+  namespace: os-glance
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: glance-manager
+        version: v0.1.0
+      name: glance-manager
+      namespace: os-glance
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: glance-manager
+          image:  docker.io/port/glance-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: glance-manager
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: glance
+  namespace: os-glance
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  glance-keystone-user: {{GLANCE_KEYSTONE_USER}}
+  glance-keystone-password: {{GLANCE_KEYSTONE_PASSWORD}}
+  glance-db-name: {{GLANCE_DB_NAME}}
+  glance-db-user: {{GLANCE_DB_USER}}
+  glance-db-password: {{GLANCE_DB_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: glance
+    version: v0.1.0
+  name: glance
+  namespace: os-glance
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: glance
+        version: v0.1.0
+      name: glance
+      namespace: os-glance
+    spec:
+      nodeSelector:
+        openstack-glance: 'true'
+        arch: 'x86'
+      containers:
+        - name: glance
+          image: docker.io/port/glance-api:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+          - containerPort: 9292
+            name: http
+            protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: os-glance
+              mountPath: "/var/lib/glance"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: glance
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: os-ssl
+          secret:
+            secretName: glance-ssl-secret
+        - name: os-glance
+          persistentVolumeClaim:
+            claimName: os-glance
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: glance-registry
+  namespace: os-glance
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  glance-keystone-user: {{GLANCE_KEYSTONE_USER}}
+  glance-keystone-password: {{GLANCE_KEYSTONE_PASSWORD}}
+  glance-db-name: {{GLANCE_DB_NAME}}
+  glance-db-user: {{GLANCE_DB_USER}}
+  glance-db-password: {{GLANCE_DB_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: glance-registry
+    version: v0.1.0
+  name: glance-registry
+  namespace: os-glance
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: glance-registry
+        version: v0.1.0
+      name: glance-registry
+      namespace: os-glance
+    spec:
+      nodeSelector:
+        openstack-glance: 'true'
+        arch: 'x86'
+      containers:
+        - name: glance-registry
+          image: docker.io/port/glance-registry:latest
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 9191
+            name: http-registry
+            protocol: TCP
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: os-glance
+              mountPath: "/var/lib/glance"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: glance-registry
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: os-ssl
+          secret:
+            secretName: glance-registry-ssl-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: os-glance
+          persistentVolumeClaim:
+            claimName: os-glance

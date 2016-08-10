@@ -1,0 +1,372 @@
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: keystone-nfs
+#   namespace: os-keystone
+# type: Opaque
+# data:
+#   kube-endpoint: {{KUBE_ENDPOINT}}
+# ---
+# apiVersion: v1
+# kind: ReplicationController
+# metadata:
+#   labels:
+#     openstack-app: keystone-nfs
+#     version: v0.1.0
+#   name: keystone-nfs
+#   namespace: os-keystone
+# spec:
+#   replicas: 1
+#   template:
+#     metadata:
+#       labels:
+#         openstack-app: keystone-nfs
+#         version: v0.1.0
+#       name: keystone-nfs
+#       namespace: os-keystone
+#     spec:
+#       nodeSelector:
+#         openstack-keystone: 'true'
+#         arch: 'x86'
+#       containers:
+#         - name: keystone-nfs
+#           image: docker.io/port/nfs:latest
+#           imagePullPolicy: Always
+#           ports:
+#             - name: nfs
+#               containerPort: 2049
+#               protocol: TCP
+#           env:
+#             - name: OS_DOMAIN
+#               value: {{OS_DOMAIN}}
+#           volumeMounts:
+#             - name: os-config
+#               mountPath: "/etc/os-config"
+#               readOnly: true
+#             - name: data
+#               mountPath: "/srv/data"
+#               readOnly: false
+#           securityContext:
+#             privileged: true
+#       volumes:
+#         - name: os-config
+#           secret:
+#             secretName: keystone-nfs
+#         - name: data
+#           emptyDir: {}
+# ---
+# kind: PersistentVolume
+# apiVersion: v1
+# metadata:
+#   labels:
+#     openstack-app: os-keystone
+#   name: os-keystone
+# spec:
+#   capacity:
+#     storage: 10Gi
+#   accessModes:
+#     - ReadWriteMany
+#   nfs:
+#     server: os-keystone-nfs.os-keystone.svc.{{OS_DOMAIN}}
+#     path: /
+#     readOnly: false
+# ---
+# kind: PersistentVolumeClaim
+# apiVersion: v1
+# metadata:
+#   labels:
+#     openstack-app: os-keystone
+#   name: os-keystone
+#   namespace: os-keystone
+# spec:
+#   accessModes:
+#     - ReadWriteMany
+#   resources:
+#     requests:
+#       storage: 1Gi
+# ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: keystone-manager
+  namespace: os-keystone
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-db-name: {{KEYSTONE_DB_NAME}}
+  keystone-db-user: {{KEYSTONE_DB_USER}}
+  keystone-db-password: {{KEYSTONE_DB_PASSWORD}}
+  keystone-ldap-user: {{KEYSTONE_LDAP_USER}}
+  keystone-ldap-password: {{KEYSTONE_LDAP_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: keystone-manager
+    version: v0.1.0
+  name: keystone-manager
+  namespace: os-keystone
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: keystone-manager
+        version: v0.1.0
+      name: keystone-manager
+      namespace: os-keystone
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: keystone-manager
+          image:  docker.io/port/keystone-manager:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+            # - name: keystone-nfs
+            #   mountPath: "/mnt/keystone"
+            #   readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: keystone-manager
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+        # - name: keystone-nfs
+        #   persistentVolumeClaim:
+        #     claimName: os-keystone
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: keystone
+  namespace: os-keystone
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-db-name: {{KEYSTONE_DB_NAME}}
+  keystone-db-user: {{KEYSTONE_DB_USER}}
+  keystone-db-password: {{KEYSTONE_DB_PASSWORD}}
+  keystone-ldap-user: {{KEYSTONE_LDAP_USER}}
+  keystone-ldap-password: {{KEYSTONE_LDAP_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: keystone
+    version: v0.1.0
+  name: keystone
+  namespace: os-keystone
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: keystone
+        version: v0.1.0
+      name: keystone
+      namespace: os-keystone
+    spec:
+      nodeSelector:
+        openstack-keystone: 'true'
+        arch: 'x86'
+      containers:
+        - name: keystone-api
+          image: docker.io/port/keystone-api:latest
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 5000
+            name: api
+            protocol: TCP
+          - containerPort: 35357
+            name: admin
+            protocol: TCP
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: os-websso
+              mountPath: "/etc/os-websso"
+              readOnly: true
+            - name: os-fernet
+              mountPath: "/etc/os-fernet"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      volumes:
+        - name: os-config
+          secret:
+            secretName: keystone
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl
+          secret:
+            secretName: keystone-ssl-secret
+        - name: os-websso
+          secret:
+            secretName: keystone-websso-secret
+        - name: os-fernet
+          secret:
+            secretName: keystone-fernet-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: keystone-v2
+  namespace: os-keystone
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-db-name: {{KEYSTONE_DB_NAME}}
+  keystone-db-user: {{KEYSTONE_DB_USER}}
+  keystone-db-password: {{KEYSTONE_DB_PASSWORD}}
+  keystone-ldap-user: {{KEYSTONE_LDAP_USER}}
+  keystone-ldap-password: {{KEYSTONE_LDAP_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: keystone-v2
+    version: v0.1.0
+  name: keystone-v2
+  namespace: os-keystone
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: keystone-v2
+        version: v0.1.0
+      name: keystone-v2
+      namespace: os-keystone
+    spec:
+      nodeSelector:
+        openstack-keystone: 'true'
+        arch: 'x86'
+      containers:
+        - name: keystone-v2
+          image: docker.io/port/keystone-default:latest
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 5001
+            name: api
+            protocol: TCP
+          - containerPort: 35358
+            name: admin
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: os-websso
+              mountPath: "/etc/os-websso"
+              readOnly: true
+            - name: os-fernet
+              mountPath: "/etc/os-fernet"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      volumes:
+        - name: os-config
+          secret:
+            secretName: keystone-v2
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl
+          secret:
+            secretName: keystone-v2-ssl-secret
+        - name: os-websso
+          secret:
+            secretName: keystone-websso-secret
+        - name: os-fernet
+          secret:
+            secretName: keystone-fernet-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt

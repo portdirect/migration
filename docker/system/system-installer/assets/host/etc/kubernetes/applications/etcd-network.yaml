@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd-network
+  namespace: network-system
+  labels:
+    harbor-app: etcd-network
+spec:
+  selector:
+    harbor-app: etcd-network
+  clusterIP: 10.100.0.4
+  type: NodePort
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 4001
+    targetPort: 401
+    nodePort: 4001
+    protocol: TCP
+    name: https

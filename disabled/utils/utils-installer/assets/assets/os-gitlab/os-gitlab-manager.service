@@ -1,0 +1,27 @@
+[Unit]
+Description=HarborOS: OpenStack: gitlab Manager: Service
+After=docker.service freeipa.service os-database.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+EnvironmentFile=/etc/os-common/common.env
+RemainAfterExit=True
+
+
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/var/usrlocal/bin/os-gitlab-manager-flight.sh
+ExecStart=/bin/echo 'gitlab Configured'
+ExecStartPost=/bin/etcdctl set /${OS_DISTRO}/gitlab/status DOWN
+
+ExecStop=/bin/etcdctl set /${OS_DISTRO}/gitlab/status DOWN
+
+ExecStop=-/bin/kubectl delete -f /etc/os-gitlab/kube/os-gitlab-manager_replicationcontroller.yaml --namespace=os-gitlab
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=os-gitlab-api.service

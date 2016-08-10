@@ -1,0 +1,36 @@
+#!/bin/bash
+
+HARBOR_SWIFT_VG=harbor-swift
+HOSTNAME=$(hostname -s)
+HARBOROS_ETCD_ROOT=/harboros
+HARBOR_SWIFT_VG=harbor-swift
+SWIFT_ROLE=swift
+
+prep_swift_devs () {
+  for DISC_TYPE in ssd hdd; do
+    etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE}/${HOSTNAME} | grep role | \
+        while read ETCD_KEY; do
+          ROLE=$(etcdctl get ${ETCD_KEY})
+          DEVICE=$(echo ${ETCD_KEY%/*} | sed 's#.*/##')
+          if [ "${ROLE}" == "${SWIFT_ROLE}" ]; then
+            if vgscan | grep -q "${HARBOR_SWIFT_VG}-${DEVICE}"
+              then echo "Persistent volume group ${HARBOR_SWIFT_VG}-${DEVICE} is prepped"
+              else
+              parted  --script /dev/${DEVICE} mklabel GPT
+              parted  --script /dev/${DEVICE} mkpart primary 0% 100%
+              parted  --script /dev/${DEVICE} set 1 lvm on
+              pvcreate /dev/${DEVICE}1
+              vgcreate ${HARBOR_SWIFT_VG}-${DEVICE} /dev/${DEVICE}1
+            fi
+            if lvscan | grep -q "/dev/${HARBOR_SWIFT_VG}-${DEVICE}/${DEVICE}"
+              then echo "${DEVICE} is prepped"
+              else
+              echo -y | lvcreate --wipesignatures y -l 100%FREE -n ${DEVICE} ${HARBOR_SWIFT_VG}-${DEVICE}
+              mkfs.xfs -f -i size=2048 /dev/${HARBOR_SWIFT_VG}-${DEVICE}/${DEVICE}
+            fi
+          fi
+        done
+  done
+}
+
+prep_swift_devs

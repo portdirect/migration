@@ -1,0 +1,23 @@
+FROM %%DOCKER_NAMESPACE%%/%%DOCKER_PREFIX%%nova-compute-base:%%DOCKER_TAG%%
+ENV OPENSTACK_COMPONENT="lxd" \
+    INIT_DB_REQUIRED="True"
+
+ADD ./assets/etc/yum.repos.d/elrepo-kernel.repo /etc/yum.repos.d/elrepo-kernel.repo
+RUN yum install -y \
+        kernel-ml-headers \
+        go \
+        lxc-devel
+
+RUN yum install -y git
+
+ENV WORK_DIR=/root/lxd
+ENV GOPATH=$WORK_DIR/go
+RUN mkdir -p $GOPATH
+RUN cd $WORK_DIR && go get -v -u github.com/lxc/lxd
+RUN cd $GOPATH/src/github.com/lxc/lxd && make
+
+RUN cp -rf $GOPATH/bin/* /usr/bin
+#/usr/lib/x86_64-linux-gnu/lxc/lxc-net start
+
+#lxd daemon &
+brc

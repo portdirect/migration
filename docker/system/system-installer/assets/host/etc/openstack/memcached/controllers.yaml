@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: memcached
+    version: v0.1.0
+  name: memcached
+  namespace: os-memcached
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        openstack-app: memcached
+        version: v0.1.0
+      name: openstack-memcached
+      namespace: os-memcached
+    spec:
+      nodeSelector:
+        openstack-memcached: 'true'
+        arch: 'x86'
+      containers:
+        - name: openstack-memcached
+          image:  docker.io/port/system-memcached:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 11211
+              name: memcached
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            privileged: false
+      restartPolicy: Always

@@ -1,0 +1,18 @@
+[Unit]
+Description=HarborOS: Docker Swarm Service
+After=etcd.service docker-bootstrap.service
+Requires=etcd.service docker-bootstrap.service
+
+[Service]
+TimeoutStartSec=0
+
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock kill swarm-api
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock rm swarm-api
+ExecStart=/var/usrlocal/bin/swarm-api-flight.sh
+ExecStop=/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock stop swarm-api
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

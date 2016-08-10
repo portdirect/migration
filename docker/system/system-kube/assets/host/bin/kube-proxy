@@ -1,0 +1,32 @@
+#!/bin/bash
+source /etc/kube/kube.env
+: ${KUBE_PORT:=6443}
+: ${KUBE_MASTER_HOST:="kubernetes.$(hostname -d)"}
+: ${KUBE_SERVICE_SUBNET:="10.112.0.0/16"}
+: ${KUBE_DEV:="br0"}
+: ${DOCKER_DEV:="docker0"}
+
+touch /etc/harbor/auth/kubelet/ca.crt
+touch /etc/harbor/auth/kubelet/kubeconfig.yaml
+
+ip route del ${KUBE_SERVICE_SUBNET} dev ${DOCKER_DEV} || true
+
+
+/usr/local/bin/harbor-docker run \
+        --name=kube-proxy \
+        --net='host' \
+        --privileged \
+        --restart=always \
+        -d \
+        -v /etc/machine-id:/etc/machine-id:ro \
+        -v /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:rw \
+        -v /etc/harbor/auth/kubelet/ca.crt:/etc/ssl/certs/ca-certificates.crt:ro \
+        -v /etc/harbor/auth/kubelet/kubeconfig.yaml:/etc/harbor/auth/kubelet/kubeconfig.yaml:ro \
+         docker.io/port/system-kube:latest /hyperkube proxy \
+            --alsologtostderr=true \
+            --bind-address=0.0.0.0 \
+            --v=3 \
+            --master=https://${KUBE_MASTER_HOST}:${KUBE_PORT} \
+            --kubeconfig="/etc/harbor/auth/kubelet/kubeconfig.yaml"
+
+ip route add ${KUBE_SERVICE_SUBNET} dev ${DOCKER_DEV}

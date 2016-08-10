@@ -1,0 +1,110 @@
+#!/bin/bash
+
+: ${HARBOR_GLUSTER_VG:=harbor-gluster}
+: ${HARBOR_GLUSTER_LIB_VOL:=var-lib-glusterd}
+: ${HARBOR_GLUSTER_LIB_DIR:=/var/lib/glusterd}
+: ${HARBOR_GLUSTER_LIB_SIZE:=4G}
+
+
+: ${HARBOR_GLUSTER_DATA_POOL:=gluster-pool}
+: ${HARBOR_GLUSTER_DATA_POOL_SIZE:='90%FREE'}
+: ${HARBOR_GLUSTER_DATA_METADATA_SIZE:=1G}
+
+
+
+
+HOSTNAME=$(hostname -s)
+HARBOROS_ETCD_ROOT=/harboros
+
+GLUSTER_ROLE=glusterfs
+
+prep_gluster_vg () {
+  for DISC_TYPE in ssd hdd; do
+    etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE}/${HOSTNAME} | grep role | \
+        while read ETCD_KEY; do
+          ROLE=$(etcdctl get ${ETCD_KEY})
+          DEVICE=$(echo ${ETCD_KEY%/*} | sed 's#.*/##')
+          if [ "${ROLE}" == "${GLUSTER_ROLE}" ]; then
+            # if the device is not ininitialzed as a lvm pv do that now
+            pvdisplay /dev/${DEVICE}1 || (
+              parted  --script /dev/${DEVICE} mklabel GPT
+              parted  --script /dev/${DEVICE} mkpart primary 1MiB ${HARBOR_GLUSTER_LIB_SIZE}
+              parted  --script /dev/${DEVICE} set 1 lvm on
+              parted  --script /dev/${DEVICE} mkpart primary ${HARBOR_GLUSTER_LIB_SIZE} 100%
+              parted  --script /dev/${DEVICE} set 2 lvm on
+              pvcreate /dev/${DEVICE}1
+              pvdisplay /dev/${DEVICE}1
+            )
+            # if the device is not ininitialzed as a lvm pv do that now
+            pvdisplay /dev/${DEVICE}2 || (
+              pvcreate /dev/${DEVICE}2
+              pvdisplay /dev/${DEVICE}2
+            )
+            if vgscan | grep -q "${HARBOR_GLUSTER_LIB_VOL}"; then
+              vgextend ${HARBOR_GLUSTER_LIB_VOL} /dev/${DEVICE}1
+            else
+              vgcreate ${HARBOR_GLUSTER_LIB_VOL} /dev/${DEVICE}1
+            fi
+          fi
+        done
+  done
+}
+
+prep_gluster_lib () {
+  for DISC_TYPE in ssd hdd; do
+    etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs//${DISC_TYPE}/${HOSTNAME} | grep role | \
+        while read ETCD_KEY; do
+          ROLE=$(etcdctl get ${ETCD_KEY})
+          DEVICE=$(echo ${ETCD_KEY%/*} | sed 's#.*/##')
+          if [ "${ROLE}" == "${GLUSTER_ROLE}" ]; then
+            if vgscan | grep -q "${HARBOR_GLUSTER_LIB_VOL}"; then
+              vgextend ${HARBOR_GLUSTER_LIB_VOL} /dev/${DEVICE}1
+            else
+              vgcreate ${HARBOR_GLUSTER_LIB_VOL} /dev/${DEVICE}1
+            fi
+            HARBOR_GLUSTER_LIB_NUM_PV=$(vgdisplay --colon ${HARBOR_GLUSTER_LIB_VOL} | awk -F ":" '{print $11}')
+            HARBOR_GLUSTER_LIB_NUM_MIRRORS=$((HARBOR_GLUSTER_LIB_NUM_PV - 1))
+            if lvscan | grep -q "/dev/${HARBOR_GLUSTER_LIB_VOL}/${HARBOR_GLUSTER_LIB_VOL}"; then
+              lvconvert -m$HARBOR_GLUSTER_LIB_NUM_MIRRORS /dev/${HARBOR_GLUSTER_LIB_VOL}/${HARBOR_GLUSTER_LIB_VOL}
+            else
+              echo -y | lvcreate -m$HARBOR_GLUSTER_LIB_NUM_MIRRORS --wipesignatures y -l 90%FREE -n ${HARBOR_GLUSTER_LIB_VOL} ${HARBOR_GLUSTER_LIB_VOL}
+              mkfs.xfs -f -i size=2048 /dev/${HARBOR_GLUSTER_LIB_VOL}/${HARBOR_GLUSTER_LIB_VOL}
+            fi
+          fi
+        done
+  done
+}
+
+prep_gluster_bricks () {
+  for DISC_TYPE in ssd hdd; do
+    etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs//${DISC_TYPE}/${HOSTNAME} | grep role | \
+        while read ETCD_KEY; do
+          ROLE=$(etcdctl get ${ETCD_KEY})
+          DEVICE=$(echo ${ETCD_KEY%/*} | sed 's#.*/##')
+          if [ "${ROLE}" == "${GLUSTER_ROLE}" ]; then
+            if vgscan | grep -q "${HARBOR_GLUSTER_VG}-${DEVICE}"; then
+              vgdisplay ${HARBOR_GLUSTER_VG}-${DEVICE}
+            else
+              vgcreate ${HARBOR_GLUSTER_VG}-${DEVICE} /dev/${DEVICE}2
+              vgdisplay ${HARBOR_GLUSTER_VG}-${DEVICE}
+            fi
+            if lvscan | grep "/dev/${HARBOR_GLUSTER_VG}-${DEVICE}/${HARBOR_GLUSTER_VG}-${DEVICE}"
+              then echo "${HARBOR_GLUSTER_VG}-${DEVICE} is prepped"
+              else
+              lvcreate -n ${HARBOR_GLUSTER_VG}-${DEVICE}-metadata -L ${HARBOR_GLUSTER_DATA_METADATA_SIZE} ${HARBOR_GLUSTER_VG}-${DEVICE}
+              lvcreate -n ${HARBOR_GLUSTER_VG}-${DEVICE} -l ${HARBOR_GLUSTER_DATA_POOL_SIZE} ${HARBOR_GLUSTER_VG}-${DEVICE}
+              lvconvert --yes --type thin-pool --poolmetadata ${HARBOR_GLUSTER_VG}-${DEVICE}/${HARBOR_GLUSTER_VG}-${DEVICE}-metadata ${HARBOR_GLUSTER_VG}-${DEVICE}/${HARBOR_GLUSTER_VG}-${DEVICE}
+            fi
+          fi
+        done
+  done
+}
+
+
+
+
+
+
+prep_gluster_vg
+prep_gluster_lib
+prep_gluster_bricks

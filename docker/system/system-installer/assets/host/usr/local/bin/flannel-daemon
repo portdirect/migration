@@ -1,0 +1,105 @@
+#!/bin/bash
+set -e
+PATH=${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+
+HOST_FLANNEL_PUBLIC_DEV=eth0
+
+cat > /etc/resolv-ext-flannel.conf <<EOF
+nameserver ${EXTERNAL_DNS}
+nameserver ${EXTERNAL_DNS_1}
+EOF
+
+
+if [ -f /etc/master-node ]
+  then
+    if etcdctl-network ls ; then
+        echo "Command succeeded"
+    else
+        echo "Command failed"
+        docker-bootstrap stop bootstrap-etcd-network || true
+        docker-bootstrap rm bootstrap-etcd-network || true
+        docker-bootstrap run -d \
+            --name bootstrap-etcd-network \
+            -p 127.0.0.1:4001:4001 \
+            -p 127.0.0.1:7001:7001 \
+            -v /var/lib/harbor/etcd/network:/var/etcd:rw \
+            -v /etc/harbor/auth/etcd-network/ca.crt:/etc/os-ssl/ca:ro \
+            -v /etc/harbor/auth/etcd-network/etcd-network.crt:/etc/os-ssl/cirt:ro \
+            -v /etc/harbor/auth/etcd-network/etcd-network.key:/etc/os-ssl/key:ro \
+            docker.io/port/system-etcd:latest \
+                etcd \
+                --name=master \
+                --data-dir=/var/etcd \
+                --listen-client-urls=https://0.0.0.0:4001 \
+                --listen-peer-urls=https://0.0.0.0:7001 \
+                --advertise-client-urls=https://etcd-network.${OS_DOMAIN}:4001 \
+                --initial-advertise-peer-urls="https://$(hostname -s).${OS_DOMAIN}:7001" \
+                --initial-cluster="master=https://$(hostname -s).${OS_DOMAIN}:7001" \
+                --initial-cluster-token='etcd-cluster' \
+                --ca-file=/etc/os-ssl/ca \
+                --cert-file=/etc/os-ssl/cirt \
+                --key-file=/etc/os-ssl/key \
+                --peer-ca-file=/etc/os-ssl/ca \
+                --peer-cert-file=/etc/os-ssl/cirt \
+                --peer-key-file=/etc/os-ssl/key
+    fi
+fi
+
+
+
+HOST_FLANNEL_PUBLIC_IP=$(ip -f inet -o addr show $HOST_FLANNEL_PUBLIC_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+
+docker-bootstrap stop flannel || true
+docker-bootstrap kill flannel || true
+docker-bootstrap rm -v flannel || true
+
+docker-bootstrap run \
+    --name flannel \
+    --net=host \
+    --privileged \
+    --restart=always \
+    -d \
+    -v /etc/resolv-ext-flannel.conf:/etc/resolv.conf:ro \
+    -v /dev/net:/dev/net:rw \
+    -v /run/flannel:/run/flannel:rw \
+    -v /etc/harbor/auth/host/ca.crt:/etc/os-ssl/ca:ro \
+    -v /etc/harbor/auth/host/host.crt:/etc/os-ssl/cirt:ro \
+    -v /etc/harbor/auth/host/host.key:/etc/os-ssl/key:ro \
+    docker.io/port/system-flannel:latest \
+      /opt/bin/flanneld \
+      --ip-masq=true \
+      --alsologtostderr=true \
+      --iface=eth0 \
+      --etcd-prefix="/flannel/network" \
+      --public-ip="${HOST_FLANNEL_PUBLIC_IP}" \
+      -networks="core,wan" \
+      -etcd-cafile="/etc/os-ssl/ca" \
+      -etcd-certfile="/etc/os-ssl/cirt" \
+      -etcd-keyfile="/etc/os-ssl/key" \
+      -etcd-endpoints="https://etcd-network.${OS_DOMAIN}:4001"
+
+
+if [ -f /etc/master-node ]
+  then
+    until etcdctl-network set /flannel/network/core/config "{ \"Network\": \"${FLANNEL_CORE_NETWORK}\", \"Backend\": { \"Type\": \"vxlan\", \"VNI\": 2 } }"
+    do
+         echo "Waiting for ETCD"
+         sleep 2
+    done
+    until etcdctl-network set /flannel/network/wan/config "{ \"Network\": \"${FLANNEL_WAN_NETWORK}\", \"Backend\": { \"Type\": \"vxlan\", \"VNI\": 1 } }"
+    do
+         echo "Waiting for ETCD"
+         sleep 2
+    done
+    until [ -f /var/run/flannel/networks/core.env ]
+    do
+         echo "Waiting for Core Flannel subnet"
+         sleep 2
+    done
+    until [ -f /var/run/flannel/networks/wan.env ]
+    do
+         echo "Waiting for Wan Flannel subnet"
+         sleep 2
+    done
+fi

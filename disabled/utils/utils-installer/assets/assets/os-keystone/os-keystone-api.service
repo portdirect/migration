@@ -1,0 +1,30 @@
+[Unit]
+Description=HarborOS: OpenStack: keystone Service
+After=docker.service freeipa.service os-keystone-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=/var/usrlocal/bin/os-keystone-api-preflight.sh
+
+#ExecStartPre=-/bin/kubectl delete -f /etc/os-keystone/kube/os-keystone-api_service.yaml --namespace=os-keystone
+ExecStartPre=-/bin/kubectl delete -f /etc/os-keystone/kube/os-keystone-api_replicationcontroller.yaml --namespace=os-keystone
+ExecStartPre=-/bin/kubectl delete -f /etc/os-keystone/kube/os-keystone_secrets.yaml --namespace=os-keystone
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/bin/kubectl create -f /etc/os-keystone/kube/os-keystone_secrets.yaml --namespace=os-keystone
+ExecStartPre=/bin/kubectl create -f /etc/os-keystone/kube/os-keystone-api_replicationcontroller.yaml --namespace=os-keystone
+ExecStart=/bin/kubectl create -f /etc/os-keystone/kube/os-keystone-api_service.yaml --namespace=os-keystone
+
+#ExecStop=-/bin/kubectl delete -f /etc/os-keystone/kube/os-keystone-api_service.yaml --namespace=os-keystone
+ExecStop=-/bin/kubectl delete -f /etc/os-keystone/kube/os-keystone-api_replicationcontroller.yaml --namespace=os-keystone
+ExecStop=-/bin/kubectl delete -f /etc/os-keystone/kube/os-keystone_secrets.yaml --namespace=os-keystone
+
+
+[Install]
+WantedBy=multi-user.target

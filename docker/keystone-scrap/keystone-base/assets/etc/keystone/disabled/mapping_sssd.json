@@ -1,0 +1,59 @@
+[
+    {
+        "local": [
+            {
+                "user": {
+                    "name": "{0}",
+                    "domain": {"name": "Default"}
+                }
+            }
+        ],
+        "remote": [
+            {
+                "type": "REMOTE_USER"
+            }
+        ]
+    },
+
+    {
+        "local": [
+            {
+                "groups": "{0}",
+                "domain": {
+                    "name": "Default"
+                }
+            }
+        ],
+        "remote": [
+            {
+                "type": "REMOTE_USER_GROUPS",
+                "whitelist": ["ipausers", "admins"]
+            }
+        ]
+    },
+
+    {
+        "local": [
+            {
+                "group": {
+                    "name": "services",
+                    "domain": {
+                        "name": "Default"
+                    }
+                }
+            }
+        ],
+        "remote": [
+            {
+                "type": "GSS_NAME",
+                "any_one_of": [
+                    "glance/keystone.{{ OS_DOMAIN }}@{{ OS_REALM }}",
+                    "cinder/keystone.{{ OS_DOMAIN }}@{{ OS_REALM }}",
+                    "nova/keystone.{{ OS_DOMAIN }}@{{ OS_REALM }}",
+                    "barbican/keystone.{{ OS_DOMAIN }}@{{ OS_REALM }}",
+                    "neutron/keystone.{{ OS_DOMAIN }}@{{ OS_REALM }}"
+                ]
+            }
+        ]
+    }
+]

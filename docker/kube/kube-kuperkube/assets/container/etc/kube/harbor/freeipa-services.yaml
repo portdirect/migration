@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    harbor-app: freeipa-master
+  name: freeipa-master
+  namespace: harbor-freeipa
+spec:
+  clusterIP: {{CLUSTER_MASTER_IPA_IP}}
+  ports:
+  - port: 443
+    protocol: TCP
+    name: https
+  - port: 80
+    protocol: TCP
+    name: http
+  - port: 53
+    protocol: TCP
+    name: dns
+  - port: 53
+    protocol: UDP
+    name: dns-udp
+  - port: 389
+    protocol: TCP
+    name: ldap
+  - port: 636
+    protocol: UDP
+    name: ldaps
+  - port: 88
+    protocol: TCP
+    name: kerb
+  - port: 88
+    protocol: UDP
+    name: kerb-udp
+  - port: 464
+    protocol: TCP
+    name: kerb-pwd
+  - port: 464
+    protocol: UDP
+    name: kerb-pwd-udp
+  - port: 123
+    protocol: UDP
+    name: ntp
+  - port: 7389
+    protocol: TCP
+    name: ipa-ldap
+  - port: 9443
+    protocol: TCP
+    name: dogtag-agent
+  - port: 9444
+    protocol: TCP
+    name: dogtag-user
+  - port: 9445
+    protocol: TCP
+    name: dogtag-admin

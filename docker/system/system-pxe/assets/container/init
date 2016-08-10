@@ -1,0 +1,94 @@
+#!/bin/sh
+set -e
+
+################################################################################
+echo "${OS_DISTRO}: Generating local environment file from secrets_dir"
+################################################################################
+SECRETS_DIR=/etc/os-config
+find $SECRETS_DIR -type f -print -exec sh -c "cat {} | sed  's|\\\n$||g'; echo " \; > /etc/os-container.env
+sed -i '/^\// d' /etc/os-container.env
+
+
+################################################################################
+echo "${OS_DISTRO}: Sourcing local environment variables"
+################################################################################
+source /etc/os-container.env
+
+# Setting defaults
+OS_DISTRO=HarborOS
+: ${EXT_DEV:=brex0}
+: ${PXE_INTERFACE:=br0}
+: ${ROUTER_INTERFACE:=br0}
+: ${DNS_INTERFACE:=br0}
+: ${PXE_HTTP_INTERFACE:=br0}
+: ${PXE_HTTP_PORT:=79}
+: ${PXE_HTTP_PROTO:=http}
+
+: ${DHCP_SERVER_INTERFACE:=br0}
+: ${DHCP_LEASE_TIME:=1h}
+: ${DHCP_RANGE_START:=10.140.1.1}
+: ${DHCP_RANGE_END:=10.140.64.254}
+: ${DHCP_RANGE_SUBNETMASK:=255.255.0.0}
+
+
+################################################################################
+echo "${OS_DISTRO}: Testing PXE etcd"
+################################################################################
+export PXE_ETCDCTL="etcdctl --peers=127.0.0.1:401"
+$PXE_ETCDCTL ls --recursive /
+
+MAX_MTU=$(ip -f inet -o link show ${ROUTER_INTERFACE} |cut -d\  -f 5| cut -d/ -f 1)
+DNS_IP=$(ip -f inet -o addr show ${DNS_INTERFACE}|cut -d\  -f 7 | cut -d/ -f 1)
+SERVER_IP=$(ip -f inet -o addr show ${PXE_INTERFACE}|cut -d\  -f 7 | cut -d/ -f 1)
+ROUTER_IP=$(ip -f inet -o addr show ${ROUTER_INTERFACE}|cut -d\  -f 7 | cut -d/ -f 1)
+PXE_HTTP_IP=$(ip -f inet -o addr show ${PXE_HTTP_INTERFACE}|cut -d\  -f 7 | cut -d/ -f 1)
+PXE_HTTP_ADDR="${PXE_HTTP_PROTO}://${PXE_HTTP_IP}:${PXE_HTTP_PORT}"
+
+
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: This server: $SERVER_IP"
+echo "${OS_DISTRO}: DNS: $DNS_IP"
+echo "${OS_DISTRO}: Router: $ROUTER_IP"
+echo "${OS_DISTRO}: MTU: ${MAX_MTU}"
+echo "${OS_DISTRO}: Http: ${PXE_HTTP_ADDR}"
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: Updating pxelinux configs"
+find /usr/share/syslinux/pxelinux.cfg/ -type f | \
+  xargs sed -i "s,{{PXE_HTTP_ADDR}},${PXE_HTTP_ADDR},g"
+
+
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: Setting up routing"
+echo "iptables -t nat -A POSTROUTING -o ${EXT_DEV} -j MASQUERADE"
+iptables -t nat -A POSTROUTING -o ${EXT_DEV} -j MASQUERADE
+echo "iptables -A FORWARD -i ${EXT_DEV} -o ${ROUTER_INTERFACE} -m state --state RELATED,ESTABLISHED -j ACCEPT"
+iptables -A FORWARD -i ${EXT_DEV} -o ${ROUTER_INTERFACE} -m state --state RELATED,ESTABLISHED -j ACCEPT
+echo "iptables -A FORWARD -i ${ROUTER_INTERFACE} -o ${EXT_DEV} -j ACCEPT"
+iptables -A FORWARD -i ${ROUTER_INTERFACE} -o ${EXT_DEV} -j ACCEPT
+
+
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: Starting PXE server"
+echo "-------------------------------------------------------------------------"
+chmod -R 0644 /usr/share/syslinux/
+chown -R pxemanager /usr/share/syslinux/pxelinux.cfg/*
+echo "search $(hostname -d)" > /etc/dnsmasq-resolv.conf
+echo "nameserver ${DNS_IP}" >> /etc/dnsmasq-resolv.conf
+exec dnsmasq --no-daemon \
+    --port=0 \
+    --listen-address=${SERVER_IP} \
+    --resolv-file=/etc/dnsmasq-resolv.conf \
+    --interface=${PXE_INTERFACE} \
+    --bind-interfaces \
+    --dhcp-range=$DHCP_RANGE_START,$DHCP_RANGE_END,$DHCP_RANGE_SUBNETMASK,$DHCP_LEASE_TIME \
+    --dhcp-option=3,${ROUTER_IP} \
+    --dhcp-option=6,${DNS_IP} \
+    --dhcp-option=26,${MAX_MTU} \
+    --dhcp-boot=pxelinux.0,pxeserver,${SERVER_IP} \
+    --pxe-service=x86PC,"${OS_DISTRO}: Managed Boot",pxelinux \
+    --enable-tftp \
+    --tftp-root=/usr/share/syslinux \
+    --dhcp-script=/bin/prep-node-pxelinux \
+    --dhcp-scriptuser=pxemanager \
+    --server=${DNS_IP} \
+    --domain=${OS_DOMAIN}

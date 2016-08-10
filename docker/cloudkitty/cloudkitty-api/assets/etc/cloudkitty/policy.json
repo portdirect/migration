@@ -1,0 +1,22 @@
+{
+    "context_is_admin":  "",
+    "default": "",
+
+    "rating:list_modules": "",
+    "rating:get_module": "",
+    "rating:update_module": "",
+    "rating:quote": "",
+
+    "report:list_tenants": "",
+    "report:get_total": "",
+
+    "collector:list_mappings": "",
+    "collector:get_mapping": "",
+    "collector:manage_mappings": "",
+    "collector:get_state": "",
+    "collector:update_state": "",
+
+    "storage:list_data_frames": "",
+
+    "rating:module_config": ""
+}

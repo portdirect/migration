@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: cockpit
+    version: v0.1.0
+  name: cockpit
+  namespace: node-cockpit
+spec:
+  hostNetwork: true
+  containers:
+  - name: cockpit
+    image: docker.io/port/undercloud-cockpit:latest
+    tty: true
+    ports:
+    - containerPort: 9090
+      hostPort: 9090
+      name: cockpit
+    securityContext:
+      privileged: true
+    volumeMounts:
+      - mountPath: /sys/fs/cgroup
+        name: cgroups
+        readOnly: true
+      - mountPath: /host/docker.sock
+        name: swarm-socket
+  volumes:
+    - name: cgroups
+      hostPath:
+        path: /sys/fs/cgroup
+    - name: swarm-socket
+      hostPath:
+        path: /var/run/swarm/docker.sock

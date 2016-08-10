@@ -1,0 +1,6 @@
+[Unit]
+Description=Harbor System Config Update Service
+
+[Service]
+ExecStart=/var/usrlocal/bin/harbor-update.sh
+Type=oneshot

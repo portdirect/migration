@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: messaging
+  name: os-messaging
+  namespace: os-messaging
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 5672
+    targetPort: 5672
+    name: rabbitmq
+  selector:
+    openstack-app: messaging

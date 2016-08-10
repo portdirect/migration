@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block html_element %}
+<html class="login-pf">
+{% endblock %}
+{% block title %}{% trans "Login" %}{% endblock %}
+
+{% block body_id %}splash{% endblock %}
+
+{% block content %}
+  {% include 'auth/_login.html' %}
+{% endblock %}
+
+{% block footer %}
+  {% include '_login_footer.html' %}
+{% endblock %}

@@ -1,0 +1,29 @@
+#!/bin/bash
+set -e
+
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: Config"
+echo "-------------------------------------------------------------------------"
+NEUTRON_DEV="br1"
+echo "${OS_DISTRO}: Neutron Device: ${NEUTRON_DEV}"
+echo "-------------------------------------------------------------------------"
+ROUTER_ADDR="100.64.0.1/16"
+echo "${OS_DISTRO}: Router Address: ${ROUTER_ADDR}"
+echo "-------------------------------------------------------------------------"
+
+
+
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: Launching Docker Container"
+echo "-------------------------------------------------------------------------"
+docker stop neutron-router || true
+docker rm -v neutron-router || true
+ROUTER_CONTAINER=$(docker run --name='neutron-router' -d --cap-add='NET_ADMIN' docker.io/port/neutron-router /start.sh )
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: Adding interface to docker container"
+echo "-------------------------------------------------------------------------"
+pipework ${NEUTRON_DEV} -i eth1 ${ROUTER_CONTAINER} ${ROUTER_ADDR}
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: Monitoring Logs for ${ROUTER_CONTAINER}"
+echo "-------------------------------------------------------------------------"
+docker logs -f ${ROUTER_CONTAINER}

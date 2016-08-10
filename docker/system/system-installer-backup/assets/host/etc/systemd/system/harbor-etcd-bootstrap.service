@@ -1,0 +1,32 @@
+[Unit]
+Description=Etcd Bootstrap
+After=network.target docker-bootstrap.service
+Before=docker.service
+After=docker-bootstrap.service harbor-network-bootstrap.service
+Requires=docker-bootstrap.service harbor-network-bootstrap.service
+
+[Service]
+StandardOutput=null
+TimeoutStartSec=0
+RemainAfterExit=yes
+Type=simple
+ExecStartPre=-/usr/local/bin/harbor-docker pull  docker.io/port/system-etcd:latest
+
+ExecStartPre=-/usr/local/bin/harbor-docker stop etcd-install
+ExecStartPre=-/usr/local/bin/harbor-docker kill etcd-install
+ExecStartPre=-/usr/local/bin/harbor-docker rm -v etcd-install
+ExecStartPre=/usr/local/bin/harbor-docker run \
+              --name etcd-install \
+              --net=host \
+              -v /:/host \
+               docker.io/port/system-etcd:latest harbor-install
+ExecStartPre=-/usr/local/bin/harbor-docker stop etcd-install
+ExecStartPre=-/usr/local/bin/harbor-docker kill etcd-install
+ExecStart=/usr/local/bin/harbor-docker rm -v etcd-install
+
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

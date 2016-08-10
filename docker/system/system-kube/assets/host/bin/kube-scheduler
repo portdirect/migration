@@ -1,0 +1,19 @@
+#!/bin/bash
+source /etc/kube/kube.env
+
+: ${KUBE_PORT:=6443}
+: ${KUBE_MASTER_HOST:="kubernetes.$(hostname -d)"}
+
+
+exec harbor-docker run \
+        --name=kube-scheduler \
+        --net='host' \
+        --restart=always \
+        -d \
+        -v /etc/harbor/auth/kubelet/ca.crt:/etc/ssl/certs/ca-certificates.crt:ro \
+        -v /etc/harbor/auth/kubelet/kubeconfig.yaml:/etc/harbor/auth/kubelet/kubeconfig.yaml:ro \
+         docker.io/port/system-kube:latest /hyperkube scheduler \
+             --alsologtostderr=true \
+             --v=3 \
+             --master=https://${KUBE_MASTER_HOST}:${KUBE_PORT} \
+             --kubeconfig="/etc/harbor/auth/kubelet/kubeconfig.yaml"

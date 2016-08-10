@@ -1,0 +1,639 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ceilometer-manager
+  namespace: os-ceilometer
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  ceilometer-keystone-user: {{CEILOMETER_KEYSTONE_USER}}
+  ceilometer-keystone-password: {{CEILOMETER_KEYSTONE_PASSWORD}}
+  ceilometer-db-name: {{CEILOMETER_DB_NAME}}
+  ceilometer-db-user: {{CEILOMETER_DB_USER}}
+  ceilometer-db-password: {{CEILOMETER_DB_PASSWORD}}
+  ceilometer-metering-secret: {{CEILOMETER_METERING_SECRET}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: ceilometer-manager
+    version: v0.1.0
+  name: ceilometer-manager
+  namespace: os-ceilometer
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: ceilometer-manager
+        version: v0.1.0
+      name: ceilometer-manager
+      namespace: os-ceilometer
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: ceilometer-manager
+          image:  docker.io/port/ceilometer-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/ipa/ca.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: ipa-ldap-config
+              mountPath: /etc/openldap/ldap.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: ceilometer-manager
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: ipa-ldap-config
+          hostPath:
+            path: /etc/openldap/ldap.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ceilometer
+  namespace: os-ceilometer
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  ceilometer-keystone-user: {{CEILOMETER_KEYSTONE_USER}}
+  ceilometer-keystone-password: {{CEILOMETER_KEYSTONE_PASSWORD}}
+  ceilometer-db-name: {{CEILOMETER_DB_NAME}}
+  ceilometer-db-user: {{CEILOMETER_DB_USER}}
+  ceilometer-db-password: {{CEILOMETER_DB_PASSWORD}}
+  ceilometer-metering-secret: {{CEILOMETER_METERING_SECRET}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: ceilometer
+    version: v0.1.0
+  name: ceilometer
+  namespace: os-ceilometer
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: ceilometer
+        version: v0.1.0
+      name: ceilometer
+      namespace: os-ceilometer
+    spec:
+      nodeSelector:
+        openstack-ceilometer: 'true'
+        arch: 'x86'
+      containers:
+        - name: ceilometer
+          image: docker.io/port/ceilometer-api:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+          - containerPort: 8777
+            name: http
+            protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: ceilometer
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: os-ssl
+          secret:
+            secretName: ceilometer-ssl-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ceilometer-services
+  namespace: os-ceilometer
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  ceilometer-keystone-user: {{CEILOMETER_KEYSTONE_USER}}
+  ceilometer-keystone-password: {{CEILOMETER_KEYSTONE_PASSWORD}}
+  ceilometer-db-name: {{CEILOMETER_DB_NAME}}
+  ceilometer-db-user: {{CEILOMETER_DB_USER}}
+  ceilometer-db-password: {{CEILOMETER_DB_PASSWORD}}
+  ceilometer-metering-secret: {{CEILOMETER_METERING_SECRET}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: ceilometer-central
+    version: v0.1.0
+  name: ceilometer-central
+  namespace: os-ceilometer
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: ceilometer-central
+        version: v0.1.0
+      name: ceilometer-central
+      namespace: os-ceilometer
+    spec:
+      nodeSelector:
+        openstack-ceilometer: 'true'
+        arch: 'x86'
+      containers:
+        - name: ceilometer-central
+          image: docker.io/port/ceilometer-central:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: ceilometer-services
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: ceilometer-collector
+    version: v0.1.0
+  name: ceilometer-collector
+  namespace: os-ceilometer
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: ceilometer-collector
+        version: v0.1.0
+      name: ceilometer-collector
+      namespace: os-ceilometer
+    spec:
+      nodeSelector:
+        openstack-ceilometer: 'true'
+        arch: 'x86'
+      containers:
+        - name: ceilometer-collector
+          image: docker.io/port/ceilometer-collector:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: ceilometer-services
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: ceilometer-notification
+    version: v0.1.0
+  name: ceilometer-notification
+  namespace: os-ceilometer
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: ceilometer-notification
+        version: v0.1.0
+      name: ceilometer-notification
+      namespace: os-ceilometer
+    spec:
+      nodeSelector:
+        openstack-ceilometer: 'true'
+        arch: 'x86'
+      containers:
+        - name: ceilometer-notification
+          image: docker.io/port/ceilometer-notification:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: ceilometer-services
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: ceilometer-alarm-notifier
+    version: v0.1.0
+  name: ceilometer-alarm-notifier
+  namespace: os-ceilometer
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: ceilometer-alarm-notifier
+        version: v0.1.0
+      name: ceilometer-alarm-notifier
+      namespace: os-ceilometer
+    spec:
+      nodeSelector:
+        openstack-ceilometer: 'true'
+        arch: 'x86'
+      containers:
+        - name: ceilometer-alarm-notifier
+          image: docker.io/port/ceilometer-alarm-notifier:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: ceilometer-services
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: ceilometer-alarm-evaluator
+    version: v0.1.0
+  name: ceilometer-alarm-evaluator
+  namespace: os-ceilometer
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: ceilometer-alarm-evaluator
+        version: v0.1.0
+      name: ceilometer-alarm-evaluator
+      namespace: os-ceilometer
+    spec:
+      nodeSelector:
+        openstack-ceilometer: 'true'
+        arch: 'x86'
+      containers:
+        - name: ceilometer-alarm-evaluator
+          image: docker.io/port/ceilometer-alarm-evaluator:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: ceilometer-services
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: ceilometer-compute
+    version: v0.1.0
+  name: ceilometer-compute
+  namespace: os-ceilometer
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: ceilometer-compute
+        version: v0.1.0
+      name: ceilometer-compute
+      namespace: os-ceilometer
+    spec:
+      nodeSelector:
+        compute-hypervisor: 'libvirt'
+        arch: 'x86'
+      containers:
+        - name: ceilometer-compute
+          image: docker.io/port/ceilometer-compute:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: sys-fs-cgroup
+              mountPath: /sys/fs/cgroup
+              readOnly: false
+            - name: var-run-netns
+              mountPath: /var/run/netns
+              readOnly: false
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: host-dev
+              mountPath: /dev
+              readOnly: false
+            - name: host-run
+              mountPath: /run
+              readOnly: false
+            - name: host-machine-id
+              mountPath: /etc/machine-id
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: pod-var-lib-nova
+              mountPath: /var/lib/nova
+              readOnly: false
+            - name: pod-var-lib-nova-instances
+              mountPath: /var/lib/nova/instances
+              readOnly: false
+            - name: pod-var-lib-libvirt
+              mountPath: /var/lib/libvirt
+              readOnly: false
+            - name: pod-var-etc-libvirt-qemu
+              mountPath: /etc/libvirt/qemu
+              readOnly: false
+            - name: pod-glusterfs-mounts
+              mountPath: /usr/lib/python2.7/site-packages/mnt
+              readOnly: false
+          securityContext:
+            privileged: true
+      restartPolicy: Always
+      hostNetwork: true
+      hostPID: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: ceilometer-services
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: sys-fs-cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+        - name: var-run-netns
+          hostPath:
+            path: /var/run/netns
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: host-dev
+          hostPath:
+            path: /dev
+        - name: host-run
+          hostPath:
+            path: /run
+        - name: host-machine-id
+          hostPath:
+            path: /etc/machine-id
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: pod-var-lib-nova
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-lib-nova
+        - name: pod-var-lib-nova-instances
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-lib-nova-instances
+        - name: pod-var-lib-libvirt
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-lib-libvirt
+        - name: pod-var-etc-libvirt-qemu
+          hostPath:
+            path: /var/lib/harbor/nova/pod-var-etc-libvirt-qemu
+        - name: pod-glusterfs-mounts
+          hostPath:
+            path: /var/lib/harbor/nova/pod-glusterfs-mounts

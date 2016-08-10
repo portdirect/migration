@@ -1,0 +1,17 @@
+#!/bin/bash
+set -e
+PATH=/usr/local/bin:${PATH}
+# Todo: get mtu of docker0_ovs uplink and subtract 38 to account for gre/vxlan/geneve overhead
+: ${DOCKER_MTU:="1450"}
+: ${HOST_SKYDNS_DEV:="br0"}
+
+HOST_DOCKER_SUBNET=$(etcdctl get /ovs/network/nodes/$(hostname -f))
+HOST_SKYDNS_IP=$(ip -f inet -o addr show $HOST_SKYDNS_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+exec docker daemon \
+        --dns=${HOST_SKYDNS_IP} \
+        --log-driver=json-file \
+        --bridge=docker0 \
+        --mtu=${DOCKER_MTU} \
+        --fixed-cidr=${HOST_DOCKER_SUBNET} \
+        -H unix:///var/run/docker.sock \
+        --storage-driver overlay

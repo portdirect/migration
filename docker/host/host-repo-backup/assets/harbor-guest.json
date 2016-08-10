@@ -1,0 +1,22 @@
+{
+    "include": "harbor-host.json",
+
+    "ref": "harbor-host/7/x86_64/guest",
+
+    "initramfs-args": ["--no-hostonly"],
+
+    "packages": [ "cloud-init",
+                  "cloud-utils-growpart",
+                  "heat-cfntools",
+                  "os-apply-config",
+                  "os-cloud-config",
+                  "os-net-config",
+                  "os-prober",
+                  "os-refresh-config",
+                  "cifs-utils",
+                  "nfs-utils"],
+
+    "units": ["docker.service", "cockpit.socket"],
+    "default_target": "multi-user.target"
+
+}

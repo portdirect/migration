@@ -1,0 +1,15 @@
+[Unit]
+Description=Skydns per-node agent
+Requires=docker-bootstrap.service
+After=docker-bootstrap.service
+Before=docker.service flannel.service
+
+[Service]
+User=root
+ExecStartPre=/usr/local/bin/skydns-daemon
+ExecStart=/usr/local/bin/etcdctl-network watch /skydns/config
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

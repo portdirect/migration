@@ -1,0 +1,7 @@
+[elrepo-kernel]
+name=ELRepo.org Community Enterprise Linux Kernel Repository - el7
+baseurl=http://elrepo.org/linux/kernel/el7/x86_64/
+enabled=1
+gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-elrepo.org
+protect=0

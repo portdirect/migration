@@ -1,0 +1,85 @@
+{
+    "comment": "HarborOS derived from CentOS Atomic Host",
+
+    "osname": "harbor-host",
+    "ref": "harbor-host/7/x86_64/standard",
+
+    "repos": ["CentOS-Base", "CentOS-updates", "CentOS-extras",
+              "rhel-atomic-rebuild", "CentOS-CR",
+              "centos-openstack-mitaka", "centos-ceph-hammer", "centos-qemu-ev",
+              "centos-gluster37", "elrepo-kernel", "docker", "epel", "cockpit-preview",
+              "harbor-ovs",
+              "puppetlabs-deps", "puppetlabs-products"],
+
+    "selinux": true,
+
+    "bootstrap_packages": ["filesystem", "glibc", "nss-altfiles", "shadow-utils",
+                           "centos-release-atomic"],
+
+    "install-langs": ["en_US"],
+
+    "documentation": false,
+
+    "initramfs-args": ["--no-hostonly", "--add", "iscsi"],
+
+    "postprocess-script": "treecompose-post.sh",
+
+    "etc-group-members": ["wheel", "docker"],
+
+    "ignore-removed-users": ["root"],
+    "ignore-removed-groups": ["root"],
+    "check-passwd": { "type": "file", "filename": "passwd" },
+    "check-groups": { "type": "file", "filename": "group" },
+
+    "packages": ["systemd", "kernel-lt", "rpm-ostree-client",
+		 "dracut-network",
+		 "biosdevname",
+		 "coreutils",
+		 "lvm2",
+		 "grub2", "grub2-efi", "ostree-grub2",
+		 "efibootmgr", "shim",
+		 "e2fsprogs", "xfsprogs",
+		 "mdadm",
+		 "dmraid",
+		 "tar",
+		 "docker-engine",
+		 "docker-engine-selinux",
+		 "selinux-policy-targeted",
+		 "sssd",
+		 "cloud-init",
+		 "cloud-utils-growpart",
+		 "kexec-tools",
+		 "bridge-utils",
+		 "subscription-manager",
+		 "subscription-manager-plugin-ostree",
+		 "subscription-manager-plugin-container",
+		 "libssh", "openssh-server", "openssh-clients",
+		 "chrony",
+		 "logrotate",
+		 "passwd",
+		 "NetworkManager",
+		 "sudo",
+		 "tuned", "tuned-profiles-atomic",
+		 "irqbalance",
+		 "bash-completion",
+		 "tmux",
+		 "net-tools",
+		 "authconfig",
+		 "policycoreutils-python",
+		 "cockpit-bridge",
+		 "cockpit-shell",
+     "cockpit-storaged",
+     "cockpit-networkmanager",
+		 "cockpit-ostree",
+		 "setools-console",
+     "openvswitch-kmod",
+		 "ipa-client", "oddjob", "oddjob-mkhomedir", "realmd",
+     "device-mapper-multipath", "glusterfs-fuse"],
+
+    "remove-from-packages": [["yum", "yum-plugin-fastestmirror", "/usr/bin/.*"],
+			     ["filesystem", "/usr/share/backgrounds"]],
+
+    "units": ["tuned.service"],
+
+    "default_target": "multi-user.target"
+}

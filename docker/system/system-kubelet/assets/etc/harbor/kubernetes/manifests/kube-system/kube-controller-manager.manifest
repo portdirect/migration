@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: kube-controller-manager
+    version: v0.1.0
+  name: kube-controller-manager
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-controller-manager
+    image: docker.io/port/system-hyperkube:latest
+    command:
+      - /hyperkube
+      - controller-manager
+      - --master=127.0.0.1:8080
+      - --service-account-private-key-file=/srv/kubernetes/server.key
+      - --root-ca-file=/srv/kubernetes/ca.crt
+      - --min-resync-period=3m
+      - --v=2
+      - --logtostderr=true
+      - --cloud_config=/etc/sysconfig/kube_openstack_config
+      - --cloud_provider=openstack
+    volumeMounts:
+      - mountPath: /srv/kubernetes
+        name: kube-data
+      - mountPath: /etc/sysconfig/kube_openstack_config
+        name: kube-openstack-config
+  volumes:
+    - name: kube-data
+      hostPath:
+        path: /var/lib/harbor/kube
+    - name: kube-openstack-config
+      hostPath:
+        path: /etc/harbor/kube_openstack_config

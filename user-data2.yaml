@@ -1,0 +1,6 @@
+#cloud-config
+hostname: master
+fqdn: master.port.direct
+ssh_pwauth: False
+ssh_authorized_keys:
+  - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC0Tp8A6qDujVlA+sFSiMEqdRxXH+1MEgu2quV2IqlpnegbGIBoWQmKW0p0PyyKTPNs6iuUtMObLhz/e1M8Aqr05omALkfu4Bwjc+eJ/XynzIcr4a4RCWlFd9MBboDMU7zw8au5Qru31yGWHdtA7YqA9DfCoXK8ML4e1AZUIPNvCy3RemqGaduJrwxK9Hum6PlaUzxnaUpOXVnXL58tnWkgAGlZ9Bn+tUNby7CBTKrupQrySunNhWl1CCaCbbsXr5I0/HcGftYLgX7NZCJpB7OgTVJ1OTU5fBOQXSsmREkNPYhlM5DMFHralK9JdNygbCt6Uac/2ITbiQGfB784EbFX harbor@pro.harbor.net

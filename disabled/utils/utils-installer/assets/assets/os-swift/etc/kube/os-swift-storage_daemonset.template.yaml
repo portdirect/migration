@@ -1,0 +1,252 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rc
+      name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+    spec:
+      nodeSelector:
+        swift-storage: 'true'
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-object-server
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/swift-object-server:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: var-lock
+              mountPath: "/var/lock"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-object-auditor
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/swift-object-auditor:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: var-lock
+              mountPath: "/var/lock"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-object-replicator
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/swift-object-replicator:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: var-lock
+              mountPath: "/var/lock"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-object-updater
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/swift-object-updater:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: var-lock
+              mountPath: "/var/lock"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-container-server
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/swift-container-server:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: var-lock
+              mountPath: "/var/lock"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-account-server
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/swift-account-server:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: var-lock
+              mountPath: "/var/lock"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rsync
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/swift-rsync:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: var-lock
+              mountPath: "/var/lock"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-memcached
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/memcached:{{OS_RELEASE}}
+          ports:
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.2"
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret
+        - name: srv-node
+          hostPath:
+            path: /var/lib/os-swift
+        - name: var-lock
+        - name: var-cache-swift
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-object-expirer
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-object-expirer-rc
+      name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-object-expirer
+    spec:
+      nodeSelector:
+        swift-storage: 'true'
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-object-expirer
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/swift-object-expirer:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: var-cache-swift
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret
+        - name: srv-node
+        - name: var-cache-swift

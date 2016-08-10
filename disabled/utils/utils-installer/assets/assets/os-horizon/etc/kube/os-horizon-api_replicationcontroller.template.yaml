@@ -1,0 +1,121 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rc
+      name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+    spec:
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/horizon-base:{{OS_RELEASE}}
+          ports:
+          - containerPort: 80
+            name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+            protocol: TCP
+          - containerPort: 443
+            name: https
+            protocol: TCP
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.5"
+          securityContext:
+            privileged: false
+        - name: {{OPENSTACK_COMPONENT}}-memcached
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/memcached:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "0.1"
+            limits:
+              memory: "64Mi"
+              cpu: "0.2"
+          securityContext:
+            privileged: false
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-ssl
+          secret:
+            secretName: api-ssl-secret
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  os-tenant-proxy
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: os-tenant-proxy-rc
+      name: os-tenant-proxy
+    spec:
+      containers:
+        - name: os-tenant-proxy
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/proxy-mass:{{OS_RELEASE}}
+          ports:
+          - containerPort: 80
+            name: os-tenant-proxy
+            protocol: TCP
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.5"
+          securityContext:
+            privileged: false
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  os-web-proxy
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: os-web-proxy-rc
+      name: os-web-proxy
+    spec:
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-proxy
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/proxy-frontend:{{OS_RELEASE}}
+          ports:
+          - containerPort: 80
+            name: os-web-proxy
+            protocol: TCP
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.5"
+          securityContext:
+            privileged: false

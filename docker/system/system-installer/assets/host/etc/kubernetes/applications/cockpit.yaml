@@ -1,0 +1,70 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    harbor-app: cockpit-dashboard
+    version: v0.1.0
+  name: cockpit-dashboard
+  namespace: cockpit
+spec:
+  template:
+    metadata:
+      labels:
+        harbor-app: cockpit-dashboard
+        version: v0.1.0
+      name: cockpit-dashboard
+      namespace: cockpit
+    spec:
+      nodeSelector:
+        cockpit: 'true'
+        arch: 'x86'
+      containers:
+        - name: cockpit
+          image:  docker.io/port/system-cockpit:latest
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 500m
+              memory: 250Mi
+            requests:
+              cpu: 200m
+              memory: 128Mi
+          ports:
+            - containerPort: 9090
+              protocol: TCP
+              name: https
+          volumeMounts:
+            - name: host
+              mountPath: "/host"
+              readOnly: false
+            - name: ipa-ca
+              mountPath: "/etc/ssl/certs/ca-bundle.crt"
+              readOnly: false
+          securityContext:
+            privileged: true
+      hostNetwork: true
+      hostPID: true
+      volumes:
+        - name: host
+          hostPath:
+            path: /
+        - name: ipa-ca
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    harbor-app: cockpit-dashboard
+  name: cockpit-dashboard
+  namespace: cockpit
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 9090
+    targetPort: 9090
+    name: https
+  selector:
+    harbor-app: cockpit-dashboard

@@ -1,0 +1,27 @@
+[Unit]
+Description=HarborOS: OpenStack: swift Manager: Service
+After=docker.service freeipa.service os-database.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+EnvironmentFile=/etc/os-common/common.env
+RemainAfterExit=True
+
+
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/var/usrlocal/bin/os-swift-manager-flight.sh
+ExecStart=/bin/echo 'swift Configured'
+ExecStartPost=/usr/local/bin/etcdctl /${OS_DISTRO}/swift/status DOWN
+
+ExecStop=/usr/local/bin/etcdctl set /${OS_DISTRO}/swift/status DOWN
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-swift/kube/os-swift-manager_replicationcontroller.yaml --namespace=os-swift
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=os-swift-api.service

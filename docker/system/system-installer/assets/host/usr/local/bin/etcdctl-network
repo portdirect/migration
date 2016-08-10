@@ -1,0 +1,17 @@
+#!/bin/bash
+set -e
+PATH=${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+
+PATH=${PATH}:/usr/local/bin
+
+exec docker-bootstrap run \
+     --rm \
+     --net=host \
+     -v /:/rootfs:ro \
+     -v /etc/resolv-ext.conf:/etc/resolv.conf:ro \
+     docker.io/port/system-etcd:latest etcdctl \
+    --ca-file /rootfs/etc/harbor/auth/host/ca.crt \
+    --cert-file /rootfs/etc/harbor/auth/host/host.crt \
+    --key-file /rootfs/etc/harbor/auth/host/host.key \
+    --peers https://etcd-network.${OS_DOMAIN}:4001 "$@"

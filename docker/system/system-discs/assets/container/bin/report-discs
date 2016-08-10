@@ -1,0 +1,52 @@
+#!/bin/sh
+set -e
+# This script gets system disc and updates etcd
+: ${HARBOROS_ETCD_ROOT:="/harboros"}
+
+HOSTNAME=$(hostname -s)
+
+# ROLE
+{
+  etcdctl get ${HARBOROS_ETCD_ROOT}/nodes/${HOSTNAME}/role || \
+    etcdctl set ${HARBOROS_ETCD_ROOT}/nodes/${HOSTNAME}/role none
+}&> /dev/null
+NODE_ROLE=$(etcdctl get ${HARBOROS_ETCD_ROOT}/nodes/${HOSTNAME}/role)
+
+
+echo "NODE=${HOSTNAME}, ROLE=${NODE_ROLE}"
+
+
+# Get Block Devices
+DISC_COUNT=0
+lsblk --nodeps --ascii --output name,size,type,rota,model --list --noheadings | \
+    while read BLOCK_DEVICE_INFO; do
+      BLOCK_DEVICE_NAME=$(echo ${BLOCK_DEVICE_INFO} | awk '{print $1}')
+      BLOCK_DEVICE_SIZE=$(echo ${BLOCK_DEVICE_INFO} | awk '{print $2}')
+      BLOCK_DEVICE_TYPE=$(echo ${BLOCK_DEVICE_INFO} | awk '{print $3}')
+      BLOCK_DEVICE_ROTA=$(echo ${BLOCK_DEVICE_INFO} | awk '{print $4}')
+      BLOCK_DEVICE_MODEL=$(echo ${BLOCK_DEVICE_INFO} | awk '{print $5}')
+      if [ $BLOCK_DEVICE_ROTA -eq 0 ]; then
+        BLOCK_DEVICE_TYPE=ssd
+      else
+        BLOCK_DEVICE_TYPE=hdd
+      fi
+      {
+        if [ $DISC_COUNT -eq 0 ]; then
+          BLOCK_DEVICE_ROLE=system
+          etcdctl set ${HARBOROS_ETCD_ROOT}/discs/${BLOCK_DEVICE_TYPE}/${HOSTNAME}/${BLOCK_DEVICE_NAME}/role ${BLOCK_DEVICE_ROLE}
+        else
+          BLOCK_DEVICE_ROLE=none
+          etcdctl get ${HARBOROS_ETCD_ROOT}/discs/${BLOCK_DEVICE_TYPE}/${HOSTNAME}/${BLOCK_DEVICE_NAME}/role || \
+            etcdctl set ${HARBOROS_ETCD_ROOT}/discs/${BLOCK_DEVICE_TYPE}/${HOSTNAME}/${BLOCK_DEVICE_NAME}/role ${BLOCK_DEVICE_ROLE}
+        BLOCK_DEVICE_ROLE=$(etcdctl get ${HARBOROS_ETCD_ROOT}/discs/${BLOCK_DEVICE_TYPE}/${HOSTNAME}/${BLOCK_DEVICE_NAME}/role)
+        fi
+
+        etcdctl set ${HARBOROS_ETCD_ROOT}/discs/${BLOCK_DEVICE_TYPE}/${HOSTNAME}/${BLOCK_DEVICE_NAME}/size ${BLOCK_DEVICE_SIZE}
+
+        if [ -n "${BLOCK_DEVICE_MODEL}" ]; then
+          etcdctl set ${HARBOROS_ETCD_ROOT}/discs/${BLOCK_DEVICE_TYPE}/${HOSTNAME}/${BLOCK_DEVICE_NAME}/model ${BLOCK_DEVICE_MODEL}
+        fi
+      }&> /dev/null
+      echo "DEV=${BLOCK_DEVICE_NAME}, TYPE=${BLOCK_DEVICE_TYPE}, SIZE=${BLOCK_DEVICE_SIZE}, ROLE=${BLOCK_DEVICE_ROLE}"
+      DISC_COUNT=$((COUNTER + 1))
+    done

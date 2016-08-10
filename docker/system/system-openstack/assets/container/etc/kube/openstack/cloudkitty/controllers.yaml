@@ -1,0 +1,352 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: os-cloudkitty
+  name: os-cloudkitty
+spec:
+  capacity:
+    storage: 90Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: glusterfs.{{OS_DOMAIN}}
+    path: /os-cloudkitty
+    readOnly: false
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: os-cloudkitty
+  name: os-cloudkitty
+  namespace: os-cloudkitty
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 90Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudkitty-manager
+  namespace: os-cloudkitty
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  cloudkitty-keystone-user: {{CLOUDKITTY_KEYSTONE_USER}}
+  cloudkitty-keystone-password: {{CLOUDKITTY_KEYSTONE_PASSWORD}}
+  cloudkitty-freeipa-user: {{CLOUDKITTY_FREEIPA_USER}}
+  cloudkitty-freeipa-password: {{CLOUDKITTY_FREEIPA_PASSWORD}}
+  cloudkitty-db-name: {{CLOUDKITTY_DB_NAME}}
+  cloudkitty-db-user: {{CLOUDKITTY_DB_USER}}
+  cloudkitty-db-password: {{CLOUDKITTY_DB_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: cloudkitty-manager
+    version: v0.1.0
+  name: cloudkitty-manager
+  namespace: os-cloudkitty
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: cloudkitty-manager
+        version: v0.1.0
+      name: cloudkitty-manager
+      namespace: os-cloudkitty
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: cloudkitty-manager
+          image:  docker.io/port/cloudkitty-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+            - name: os-cloudkitty
+              mountPath: /var/lib/cloudkitty
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: cloudkitty-manager
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+        - name: os-cloudkitty
+          persistentVolumeClaim:
+            claimName: os-cloudkitty
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudkitty
+  namespace: os-cloudkitty
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  cloudkitty-keystone-user: {{CLOUDKITTY_KEYSTONE_USER}}
+  cloudkitty-keystone-password: {{CLOUDKITTY_KEYSTONE_PASSWORD}}
+  cloudkitty-freeipa-user: {{CLOUDKITTY_FREEIPA_USER}}
+  cloudkitty-freeipa-password: {{CLOUDKITTY_FREEIPA_PASSWORD}}
+  cloudkitty-db-name: {{CLOUDKITTY_DB_NAME}}
+  cloudkitty-db-user: {{CLOUDKITTY_DB_USER}}
+  cloudkitty-db-password: {{CLOUDKITTY_DB_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: cloudkitty
+    version: v0.1.0
+  name: cloudkitty
+  namespace: os-cloudkitty
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: cloudkitty
+        version: v0.1.0
+      name: cloudkitty
+      namespace: os-cloudkitty
+    spec:
+      nodeSelector:
+        openstack-cloudkitty: 'true'
+        arch: 'x86'
+      containers:
+        - name: cloudkitty-api
+          image: docker.io/port/cloudkitty-api:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: os-cloudkitty
+              mountPath: /var/lib/cloudkitty
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: cloudkitty-memcached
+          image: docker.io/port/system-memcached:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "0.1"
+            limits:
+              memory: "64Mi"
+              cpu: "0.2"
+          securityContext:
+            privileged: false
+        - name: cloudkitty-tls
+          image: docker.io/port/haproxy-ssl-terminator:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: LOCAL_HTTP_PORT
+              value: "8000"
+            - name: PUBLISH_HTTPS_PORT
+              value: "8888"
+          ports:
+          - containerPort: 8888
+            name: https
+            protocol: TCP
+          volumeMounts:
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: cloudkitty
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: os-ssl
+          secret:
+            secretName: cloudkitty-ssl-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: os-cloudkitty
+          persistentVolumeClaim:
+            claimName: os-cloudkitty
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudkitty-processor
+  namespace: os-cloudkitty
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  cloudkitty-keystone-user: {{CLOUDKITTY_KEYSTONE_USER}}
+  cloudkitty-keystone-password: {{CLOUDKITTY_KEYSTONE_PASSWORD}}
+  cloudkitty-freeipa-user: {{CLOUDKITTY_FREEIPA_USER}}
+  cloudkitty-freeipa-password: {{CLOUDKITTY_FREEIPA_PASSWORD}}
+  cloudkitty-db-name: {{CLOUDKITTY_DB_NAME}}
+  cloudkitty-db-user: {{CLOUDKITTY_DB_USER}}
+  cloudkitty-db-password: {{CLOUDKITTY_DB_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: cloudkitty-processor
+    version: v0.1.0
+  name: cloudkitty-processor
+  namespace: os-cloudkitty
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: cloudkitty-processor
+        version: v0.1.0
+      name: cloudkitty-processor
+      namespace: os-cloudkitty
+    spec:
+      nodeSelector:
+        openstack-cloudkitty: 'true'
+        arch: 'x86'
+      containers:
+        - name: cloudkitty-processor
+          image: docker.io/port/cloudkitty-processor:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: os-cloudkitty
+              mountPath: /var/lib/cloudkitty
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: cloudkitty
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: os-cloudkitty
+          persistentVolumeClaim:
+            claimName: os-cloudkitty

@@ -1,0 +1,36 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-rc
+      name: {{OPENSTACK_COMPONENT}}
+    spec:
+      nodeSelector:
+        os-database: 'true'
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/mariadb-app:{{OS_RELEASE}}
+          ports:
+            - containerPort: 3306
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: {{OPENSTACK_COMPONENT}}-storage
+              mountPath: "/var/lib/mysql"
+          securityContext:
+            privileged: true
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}
+        - name: {{OPENSTACK_COMPONENT}}-storage
+          hostPath:
+            path: {{OS_DATABASE_DIR}}

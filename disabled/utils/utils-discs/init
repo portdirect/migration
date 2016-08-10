@@ -1,0 +1,18 @@
+#!/bin/bash
+
+mkdir -p /tmp/harbor/assets
+cp -rf /opt/harbor/* /tmp/harbor/assets/
+
+
+if [ "${SCRIPT}" == "populate-gluster" ]; then
+  echo "GLUSTER_VOLUME_NAME=$GLUSTER_VOLUME_NAME" > /tmp/harbor/gluster-poplulate-volumes
+  echo "GLUSTER_VOLUME_SIZE=$GLUSTER_VOLUME_SIZE" >> /tmp/harbor/gluster-poplulate-volumes
+fi
+
+if [ "${SCRIPT}" == "reporter" ]; then
+  echo "$SCRIPT" > /tmp/harbor/harbor-mount
+else
+  echo "$SCRIPT" > /tmp/harbor/harbor-update
+fi
+
+#tail -f /tmp/harbor/log | sed '/^Finished: SUCCESS$/ q'

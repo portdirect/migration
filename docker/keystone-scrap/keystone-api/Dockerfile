@@ -1,0 +1,4 @@
+FROM %%DOCKER_NAMESPACE%%/%%DOCKER_PREFIX%%keystone-base:%%DOCKER_TAG%%
+ENV OPENSTACK_SUBCOMPONENT api
+
+ADD ./start.sh /start.sh

@@ -1,0 +1,11 @@
+# CentOS-QEMU-EV.repo
+#
+# Please see http://wiki.centos.org/SpecialInterestGroup/Virtualization for more
+# information
+
+[centos-qemu-ev]
+name=CentOS-7 - QEMU EV
+baseurl=http://mirror.centos.org/centos/7/virt/$basearch/kvm-common/
+gpgcheck=0
+enabled=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-Virtualization

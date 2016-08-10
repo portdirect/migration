@@ -1,0 +1,24 @@
+[Unit]
+Description=Initial cloud-init job (metadata service crawler)
+After=network.target cloud-init-local.service network-online.target
+Requires=network.target
+Wants=network.target cloud-init-local.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/cloud-init-wait
+ExecStartPre=/sbin/dhclient -cf /etc/dhcp/dhclient.conf
+ExecStartPre=/usr/bin/docker-set-hosts-file
+ExecStartPre=/usr/bin/cloud-init init
+ExecStartPre=/usr/bin/docker-set-hosts-file
+ExecStartPre=/usr/bin/cloud-init modules --mode=config
+ExecStartPre=/usr/bin/docker-set-hosts-file
+ExecStart=/usr/bin/cloud-init modules --mode=final
+RemainAfterExit=yes
+TimeoutSec=0
+
+# Output needs to appear in instance console output
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target

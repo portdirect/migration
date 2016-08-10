@@ -1,0 +1,12 @@
+<template>
+    <name>centos7atomic</name>
+    <os>
+        <name>RHEL-7</name>
+        <version>0</version>
+        <arch>x86_64</arch>
+        <install type='url'>
+            <url>http://rpmostree.harboros.net:8013/installer/images/</url>
+        </install>
+        <rootpw>ewwwwwww</rootpw>
+    </os>
+</template>

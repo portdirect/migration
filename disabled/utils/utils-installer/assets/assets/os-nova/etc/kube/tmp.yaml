@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  os-nova-scheduler
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: os-nova-scheduler-rc
+      name: os-nova-scheduler
+    spec:
+      containers:
+        - name: os-nova-scheduler
+          image: harboros/nova-scheduler:latest
+          env:
+            - name: OS_HOSTNAME
+              value: os-nova-scheduler.port.direct
+          volumeMounts:
+            - name: os-nova-services-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          securityContext:
+            privileged: false
+      volumes:
+        - name: os-nova-services-config
+          secret:
+            secretName: os-nova-services-secret
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  os-nova-conductor
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: os-nova-conductor-rc
+      name: os-nova-conductor
+    spec:
+      containers:
+        - name: os-nova-conductor
+          image: harboros/nova-conductor:latest
+          env:
+            - name: OS_HOSTNAME
+              value: os-nova-scheduler.port.direct
+          volumeMounts:
+            - name: os-nova-services-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          securityContext:
+            privileged: false
+      volumes:
+        - name: os-nova-services-config
+          secret:
+            secretName: os-nova-services-secret
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  os-nova-consoleauth
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: os-nova-consoleauth-rc
+      name: os-nova-consoleauth
+    spec:
+      containers:
+        - name: os-nova-consoleauth
+          image: harboros/nova-consoleauth:latest
+          env:
+            - name: OS_HOSTNAME
+              value: os-nova-consoleauth.port.direct
+          volumeMounts:
+            - name: os-nova-services-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          securityContext:
+            privileged: false
+      volumes:
+        - name: os-nova-services-config
+          secret:
+            secretName: os-nova-services-secret
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  os-nova-novncproxy
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: os-nova-novncproxy-rc
+      name: os-nova-novncproxy
+    spec:
+      containers:
+        - name: os-nova-novncproxy
+          image: harboros/nova-novncproxy:latest
+          env:
+            - name: OS_HOSTNAME
+              value: os-nova-novncproxy.port.direct
+          volumeMounts:
+            - name: os-nova-services-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          securityContext:
+            privileged: true
+      hostNetwork: true
+      volumes:
+        - name: os-nova-services-config
+          secret:
+            secretName: os-nova-services-secret

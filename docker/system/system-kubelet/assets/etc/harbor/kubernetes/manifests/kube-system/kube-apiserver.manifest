@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: kube-apiserver
+    version: v0.1.0
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-apiserver
+    image: docker.io/port/system-hyperkube:latest
+    command:
+      - /hyperkube
+      - apiserver
+      - --service-cluster-ip-range=10.10.0.0/24
+      - --insecure-bind-address=0.0.0.0
+      - --insecure-port=8080
+      - --etcd-servers=http://127.0.0.1:1401
+      - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
+      - --client-ca-file=/srv/kubernetes/ca.crt
+      - --basic-auth-file=/srv/kubernetes/basic_auth.csv
+      - --min-request-timeout=300
+      - --tls-cert-file=/srv/kubernetes/server.cert
+      - --tls-private-key-file=/srv/kubernetes/server.key
+      - --token-auth-file=/srv/kubernetes/known_tokens.csv
+      - --allow-privileged=true
+      - --v=2
+      - --logtostderr=true
+    volumeMounts:
+      - mountPath: /srv/kubernetes
+        name: kube-data
+  volumes:
+    - name: kube-data
+      hostPath:
+        path: /var/lib/harbor/kube

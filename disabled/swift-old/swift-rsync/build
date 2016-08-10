@@ -1,0 +1,144 @@
+#!/bin/bash
+
+TOPDIR=$(git rev-parse --show-toplevel)
+IMGDIR="$(cd "$(dirname "$0")" && pwd)"
+
+RELEASE_NAMESPACE=port
+NAMESPACE=port
+PREFIX=
+TAG=$(git rev-parse --short HEAD)
+RELEASE_TAG=latest
+
+usage () {
+    cat <<EOF
+Usage: $0 [options]
+
+Options:
+
+--private-registry, -r <registry_address[:port]>
+--namespace, -n <namespace>
+--tag, -t <tag>
+--push, -p
+--force-rm, -f
+--no-cache, -N
+--pull, -u
+--release
+--no-use-released-parent
+EOF
+}
+
+[ -f $TOPDIR/.buildconf ] && . $TOPDIR/.buildconf
+[ -f $IMGDIR/.buildconf ] && . $IMGDIR/.buildconf
+
+ARGS=$(getopt -o hr:n:t:pfuN -l help,namespace:,push,private-registry:,release,tag:,force-rm,no-cache,no-use-released-parent -- "$@") || { usage >&2; exit 2; }
+
+eval set -- "$ARGS"
+
+while :; do
+    case "$1" in
+
+    (--help|-h) usage
+                exit 0
+                ;;
+
+    (--release) MODE=release
+                NAMESPACE=$RELEASE_NAMESPACE
+                TAG=$RELEASE_TAG
+                ;;
+
+    (--tag|-t)  shift
+                TAG="$1"
+                ;;
+
+    (--push|-p) PUSH=1
+                ;;
+
+    (--pull|-u) BUILDFLAGS="${BUILDFLAGS} --pull=true"
+                ;;
+
+    (--force-rm|-f)
+                BUILDFLAGS="${BUILDFLAGS} --force-rm=true"
+                ;;
+
+    (--no-cache|-N)
+                BUILDFLAGS="${BUILDFLAGS} --no-cache"
+                ;;
+
+    (--private-registry|-r)
+                shift
+                REGISTRY="$1"
+                ;;
+
+    (--namespace|-n)
+                shift
+                NAMESPACE="$1"
+                ;;
+
+    (--no-use-released-parent)
+                USE_CURRENT_TAG=1
+                ;;
+
+    (--)        break
+                ;;
+
+    esac
+
+    shift
+done
+
+if [[ $USE_CURRENT_TAG = 1 ]]; then
+    PARENT_TAG=$TAG
+else
+    PARENT_TAG=$RELEASE_TAG
+fi
+
+if [ "$NAMESPACE" = "$RELEASE_NAMESPACE" ] \
+    && [ "$TAG" = "$RELEASE_TAG" ] \
+    && ! [ "$MODE" = "release" ]; then
+
+    echo "ERROR: use --release to build a release image" >&2
+    exit 1
+fi
+
+if [[ -n $REGISTRY ]]; then
+    NAMESPACE="${REGISTRY}/$NAMESPACE"
+fi
+IMAGE="$PREFIX${IMGDIR##*/}"
+FULLIMAGE="$NAMESPACE/${IMAGE}${TAG:+:${TAG}}"
+
+cat <<EOF
+======================================================================
+$FULLIMAGE
+======================================================================
+
+EOF
+
+if [ "$MODE" = "release" ]; then
+    echo "*** YOU ARE BUILDING A RELEASE IMAGE ***"
+    echo
+fi
+
+TMPDIR=$(mktemp -d /tmp/harbor-build.XXXXXXXXXX)
+cp -aL ${IMGDIR}/* ${TMPDIR}
+# Use an extension for in-place editing for portability, as GNU and BSD
+# versions of sed behave differently otherwise
+sed -i.bak "s|%%DOCKER_NAMESPACE%%|$NAMESPACE|g" ${TMPDIR}/Dockerfile
+sed -i.bak "s|%%DOCKER_PREFIX%%|$PREFIX|g" ${TMPDIR}/Dockerfile
+sed -i.bak "s|%%DOCKER_TAG%%|$PARENT_TAG|g" ${TMPDIR}/Dockerfile
+
+if ! docker build ${BUILDFLAGS} -t "${FULLIMAGE}" ${TMPDIR}; then
+    echo "ERROR: failed to build ${FULLIMAGE}"
+    exit 1
+fi
+rm -rf ${TMPDIR}
+
+echo "Built: ${FULLIMAGE}"
+
+if [ "$PUSH" = 1 ]; then
+    if ! docker push "$FULLIMAGE"; then
+        echo "ERROR: failed to push ${FULLIMAGE}"
+        exit 1
+    fi
+
+    echo "Pushed: ${FULLIMAGE}"
+fi

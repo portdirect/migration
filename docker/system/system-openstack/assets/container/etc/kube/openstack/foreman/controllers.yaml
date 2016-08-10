@@ -1,0 +1,142 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: foreman
+  name: os-foreman
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: "/var/lib/harbor/foreman"
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: foreman
+  name: os-foreman
+  namespace: os-foreman
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: foreman-manager
+  namespace: os-foreman
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  foreman-db-name: {{FOREMAN_DB_NAME}}
+  foreman-db-user: {{FOREMAN_DB_USER}}
+  foreman-db-password: {{FOREMAN_DB_PASSWORD}}
+  foreman-oauth-key: {{FOREMAN_OAUTH_KEY}}
+  foreman-oauth-secret: {{FOREMAN_OAUTH_SECRET}}
+  foreman-smtp-host: {{FOREMAN_SMTP_HOST}}
+  foreman-smtp-port: {{FOREMAN_SMTP_PORT}}
+  foreman-smtp-user: {{FOREMAN_SMTP_USER}}
+  foreman-smtp-pass: {{FOREMAN_SMTP_PASS}}
+  foreman-default-from-email: {{FOREMAN_DEFAULT_FROM_EMAIL}}
+  foreman-default-admin-email: {{FOREMAN_DEFAULT_ADMIN_EMAIL}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: foreman-manager
+    version: v0.1.0
+  name: foreman-manager
+  namespace: os-foreman
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: foreman-manager
+        version: v0.1.0
+      name: foreman-manager
+      namespace: os-foreman
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: foreman-manager
+          image:  docker.io/port/foreman-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: kubectl-binary
+              mountPath: "/bin/kubectl"
+              readOnly: true
+            - name: docker-ipa-socket
+              mountPath: "/var/run/docker-ipa.sock"
+              readOnly: false
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+            - name: data
+              mountPath: "/var/lib/harbor/foreman"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: foreman-manager
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: kubectl-binary
+          hostPath:
+            path: /usr/local/bin/kubectl
+        - name: docker-ipa-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+        - name: data
+          persistentVolumeClaim:
+            claimName: os-foreman

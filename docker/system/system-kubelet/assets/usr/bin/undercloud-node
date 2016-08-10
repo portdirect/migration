@@ -1,0 +1,36 @@
+#!/bin/sh
+
+NODE_PRIMARY_DEV=eth0
+NODE_IP="$(ip -f inet -o addr show eth0|cut -d\  -f 7 | cut -d/ -f 1)"
+NODE_PUBLIC_IP="$(ip -f inet -o addr show ${NODE_PRIMARY_DEV}|cut -d\  -f 7 | cut -d/ -f 1)"
+
+EXPOSED_IP="${NODE_IP}"
+MASTER_IP="10.142.0.15"
+ETCD_SERVICE_HOST="${MASTER_IP}"
+
+export OVS_SB_DB_IP="${MASTER_IP}"
+export OVS_NB_DB_IP="${MASTER_IP}"
+export KUBE_SERVICE_HOST="${MASTER_IP}"
+export RABBITMQ_SERVICE_HOST="${MASTER_IP}"
+export MEMCACHED_SERVICE_HOST="${MASTER_IP}"
+export MARIADB_SERVICE_HOST="${MASTER_IP}"
+export KEYSTONE_SERVICE_HOST="${MASTER_IP}"
+export NEUTRON_SERVICE_HOST="${MASTER_IP}"
+export NOVA_SERVICE_HOST="${MASTER_IP}"
+export GLANCE_SERVICE_HOST="${MASTER_IP}"
+export GLANCE_REGISTRY_SERVICE_HOST="${MASTER_IP}"
+
+
+export DB_ROOT_PASSWORD="password"
+
+. /opt/harbor/scripts/env-vars
+. /opt/harbor/scripts/helper-manifests
+
+
+
+prep_manifests common
+prep_manifests undercloud-novacompute
+
+KURYR_POOL_PREFIX=${KURYR_POOL_PREFIX:-10.10.0.0/16}
+KURYR_POOL_PREFIX_LEN=${KURYR_POOL_PREFIX_LEN:-24}
+neutron subnetpool-create --default-prefixlen $KURYR_POOL_PREFIX_LEN --pool-prefix $KURYR_POOL_PREFIX kuryr

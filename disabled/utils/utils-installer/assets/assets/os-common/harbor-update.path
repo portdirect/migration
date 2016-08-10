@@ -1,0 +1,8 @@
+[Unit]
+Description=Harbor System Config Update Service
+
+[Path]
+PathModified=/tmp/harbor/harbor-update
+
+[Install]
+WantedBy=multi-user.target

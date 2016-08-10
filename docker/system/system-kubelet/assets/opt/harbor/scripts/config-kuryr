@@ -1,0 +1,6 @@
+#!/bin/sh
+. /opt/harbor/scripts/environment-variables
+
+cfg=/etc/kuryr/kuryr.conf
+crudini --set $cfg DEFAULT bindir "/opt/kuryr/usr/libexec/kuryr"
+crudini --set $cfg k8s api_root "http://${MASTER_IP}:8080"

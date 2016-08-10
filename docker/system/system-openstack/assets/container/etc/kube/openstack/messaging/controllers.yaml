@@ -1,0 +1,146 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: messaging-manager
+  namespace: os-messaging
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: messaging-manager
+    version: v0.1.0
+  name: messaging-manager
+  namespace: os-messaging
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: messaging-manager
+        version: v0.1.0
+      name: messaging-manager
+      namespace: os-messaging
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: messaging-manager
+          image:  docker.io/port/rabbitmq-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+            - name: docker-ipa-socket
+              mountPath: "/var/run/docker-ipa.sock"
+              readOnly: false
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: messaging-manager
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-ipa-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: messaging-config
+  namespace: os-messaging
+type: Opaque
+data:
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: messaging
+    version: v0.1.0
+  name: messaging
+  namespace: os-messaging
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: messaging
+        version: v0.1.0
+      name: messaging-rabbitmq
+      namespace: os-messaging
+    spec:
+      nodeSelector:
+        openstack-messaging: 'true'
+        arch: 'x86'
+      containers:
+        - name: os-messaging
+          image:  docker.io/port/rabbitmq:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5672
+              protocol: TCP
+              name: rabbitmq
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: messaging-config
+        - name: os-ssl
+          secret:
+            secretName: messaging-ssl-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt

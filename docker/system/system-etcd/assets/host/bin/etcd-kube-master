@@ -1,0 +1,72 @@
+#!/bin/bash
+source /etc/etcd/etcd.env
+
+
+: ${ETCD_DISCOVERY_TOKEN:={{MASTER_ETCD_DISCOVERY_TOKEN}}}
+: ${ETCD_INITIAL_NODES:=1}
+
+
+ETCD_NAME=$(hostname --fqdn)
+
+
+
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: ETCD: Creating Master discovery url if required"
+echo "-------------------------------------------------------------------------"
+while grep -q "{{MASTER_ETCD_DISCOVERY_TOKEN}}" /etc/etcd/etcd-kube.env; do
+    # This is needed as sometimes DNS breaks down during initial boot.
+    until [[ $ETCD_DISCOVERY_TOKEN == https://discovery.etcd.io* ]] ;
+    do
+        ETCD_DISCOVERY_TOKEN=$(curl -w "\n" "https://discovery.etcd.io/new?size=${ETCD_INITIAL_NODES}")
+    done
+    sed -i "s,{{MASTER_ETCD_DISCOVERY_TOKEN}},${ETCD_DISCOVERY_TOKEN},g" /etc/etcd/etcd-kube.env
+    source /etc/etcd/etcd-kube.env
+done
+
+
+# ETCD_FIREWALL_ZONE=$(firewall-cmd --get-zone-of-interface=$ETCD_DEV)
+# firewall-cmd --zone=${ETCD_FIREWALL_ZONE} --add-port=7001/tcp
+# firewall-cmd --zone=${ETCD_FIREWALL_ZONE} --add-port=4001/tcp
+
+
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: ETCD: Launching"
+echo "-------------------------------------------------------------------------"
+source /etc/etcd/etcd.env
+# exec /usr/local/bin/harbor-docker run \
+#       --name etcd \
+#       --net=host \
+#       --restart=always \
+#       -d \
+#       -v /etc/ssl/certs/ca-bundle.crt:/etc/ssl/certs/ca-certificates.crt:ro \
+#       -v /var/lib/etcd/:/data:rw \
+#        ${HARBOR_ETCD_IMAGE_NAME} etcd \
+#           --name "${ETCD_NAME}" \
+#           --data-dir "/data/${ETCD_NAME}.etcd" \
+#           --listen-peer-urls "http://127.0.0.1:2380,http://0.0.0.0:7001" \
+#           --listen-client-urls "http://127.0.0.1:2379,http://0.0.0.0:4001" \
+#           --initial-advertise-peer-urls "http://$(hostname -f):7001" \
+#           --advertise-client-urls "http://$(hostname -f):4001" \
+#           --discovery "${ETCD_DISCOVERY_TOKEN}"
+exec /usr/local/bin/harbor-docker run \
+      --name kube-etcd \
+      --net=host \
+      --restart=always \
+      -d \
+      -v /etc/harbor/auth/host:/etc/harbor/auth/host:ro \
+      -v /etc/ssl/certs/ca-bundle.crt:/etc/ssl/certs/ca-certificates.crt:ro \
+      -v /var/lib/etcd/:/data:rw \
+       ${HARBOR_ETCD_IMAGE_NAME} etcd \
+          --name "${ETCD_NAME}" \
+          --data-dir "/data/${ETCD_NAME}-kube.etcd" \
+          --listen-peer-urls "https://127.0.0.1:12380,https://0.0.0.0:17001" \
+          --listen-client-urls "https://127.0.0.1:12379,https://0.0.0.0:14001" \
+          --initial-advertise-peer-urls "https://$(hostname -f):17001" \
+          --advertise-client-urls "https://$(hostname -f):14001" \
+          --discovery "${ETCD_DISCOVERY_TOKEN}" \
+          --ca-file '/etc/harbor/auth/host/ca.crt' \
+          --cert-file '/etc/harbor/auth/host/host.crt' \
+          --key-file '/etc/harbor/auth/host/host.key' \
+          --peer-ca-file '/etc/harbor/auth/host/ca.crt' \
+          --peer-cert-file '/etc/harbor/auth/host/host.crt' \
+          --peer-key-file '/etc/harbor/auth/host/host.key'

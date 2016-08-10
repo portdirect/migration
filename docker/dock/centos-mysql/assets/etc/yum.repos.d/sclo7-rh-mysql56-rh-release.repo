@@ -1,0 +1,5 @@
+[sclo7-rh-mysql56-rh-release]
+name=sclo7-rh-mysql56-rh-release
+baseurl=http://cbs.centos.org/repos/sclo7-rh-mysql56-rh-release/x86_64/os/
+enabled=1
+gpgcheck=0

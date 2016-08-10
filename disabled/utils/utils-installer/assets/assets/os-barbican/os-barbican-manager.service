@@ -1,0 +1,27 @@
+[Unit]
+Description=HarborOS: OpenStack: barbican Manager: Service
+After=docker.service freeipa.service os-database.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+EnvironmentFile=/etc/os-common/common.env
+RemainAfterExit=True
+
+
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/var/usrlocal/bin/os-barbican-manager-flight.sh
+ExecStart=/bin/echo 'barbican Configured'
+ExecStartPost=/usr/local/bin/etcdctl set /${OS_DISTRO}/barbican/status DOWN
+
+ExecStop=/usr/local/bin/etcdctl set /${OS_DISTRO}/barbican/status DOWN
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-barbican/kube/os-barbican-manager_replicationcontroller.yaml --namespace=os-barbican
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=os-barbican-api.service

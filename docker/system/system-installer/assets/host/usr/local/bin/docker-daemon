@@ -1,0 +1,25 @@
+#!/bin/bash
+set -e
+PATH=${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+source /var/run/flannel/networks/core.env
+
+DOCKER_BOOTSTRAP_IP=$(echo ${DOCKER_BOOTSTRAP_NETWORK} | awk -F '/' '{ print $1 }')
+
+ip link set docker0 down || true
+brctl delbr docker0 || true
+
+docker-bootstrap stop bootstrap-etcd-network || true
+docker-bootstrap kill bootstrap-etcd-network || true
+docker-bootstrap rm bootstrap-etcd-network || true
+
+exec /usr/bin/docker-current daemon \
+        --exec-opt native.cgroupdriver=systemd \
+        -H unix:///var/run/docker.sock \
+        -p /var/run/docker.pid \
+        --graph=/var/lib/docker \
+        --dns=${DOCKER_BOOTSTRAP_IP} \
+        --bip=${FLANNEL_SUBNET} \
+        --mtu=${FLANNEL_MTU} \
+        --userland-proxy=false \
+        --storage-driver overlay

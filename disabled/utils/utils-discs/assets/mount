@@ -1,0 +1,90 @@
+#!/bin/bash
+
+HARBOR_GLUSTER_LIB_VOL=var-lib-glusterd
+HARBOR_GLUSTER_LIB_DIR=/var/lib/glusterd
+
+mount_gluster_lib () {
+  mkdir -p ${HARBOR_GLUSTER_LIB_DIR}
+  mount /dev/${HARBOR_GLUSTER_LIB_VOL}/${HARBOR_GLUSTER_LIB_VOL} ${HARBOR_GLUSTER_LIB_DIR} || echo "not mounting"
+  chcon -Rvt svirt_sandbox_file_t ${HARBOR_GLUSTER_LIB_DIR} || echo "No SELinux"
+}
+
+umount_gluster_lib () {
+  umount ${HARBOR_GLUSTER_LIB_DIR}
+}
+
+mount_gluster_lib
+
+
+HOSTNAME=$(hostname -s)
+HARBOROS_ETCD_ROOT=/harboros
+SWIFT_ROLE=swift
+HARBOR_SWIFT_VG=harbor-swift
+HARBOR_SWIFT_MOUNT_DIR=/var/lib/os-swift
+
+mount_swift_devs () {
+  for DISC_TYPE in ssd hdd; do
+    etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE}/${HOSTNAME} | grep role | \
+        while read ETCD_KEY; do
+          ROLE=$(etcdctl get ${ETCD_KEY})
+          DEVICE=$(echo ${ETCD_KEY%/*} | sed 's#.*/##')
+          if [ "${ROLE}" == "${SWIFT_ROLE}" ]; then
+            mkdir -p ${HARBOR_SWIFT_MOUNT_DIR}/${DEVICE}
+            mount /dev/${HARBOR_SWIFT_VG}-${DEVICE}/${DEVICE} ${HARBOR_SWIFT_MOUNT_DIR}/${DEVICE} || echo "not mounting"
+            chcon -Rvt svirt_sandbox_file_t ${HARBOR_SWIFT_MOUNT_DIR}/${DEVICE} || echo "No SELinux"
+          fi
+        done
+  done
+}
+
+umount_swift_devs () {
+  for DISC_TYPE in ssd hdd; do
+    etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE}/${HOSTNAME} | grep role | \
+        while read ETCD_KEY; do
+          ROLE=$(etcdctl get ${ETCD_KEY})
+          DEVICE=$(echo ${ETCD_KEY%/*} | sed 's#.*/##')
+          if [ "${ROLE}" == "${SWIFT_ROLE}" ]; then
+            umount ${HARBOR_SWIFT_MOUNT_DIR}/${DEVICE}
+          fi
+        done
+  done
+}
+
+mount_swift_devs
+
+
+: ${HARBOR_GLUSTER_VG:=harbor-gluster}
+: ${HARBOR_GLUSTER_LIB_VOL:=var-lib-glusterd}
+: ${HARBOR_GLUSTER_DATA_POOL:=gluster-pool}
+
+HOSTNAME=$(hostname -s)
+HARBOROS_ETCD_ROOT=/harboros
+GLUSTER_ROLE=glusterfs
+HARBOR_GLUSTER_MOUNT_DIR=/var/lib/os-gluster
+################################################################################
+echo "Mounting Bricks; and creating a 'brick' dir if it does not already exist"
+################################################################################
+mount_gluster_vol_bricks () {
+  for DISC_TYPE in ssd hdd; do
+    etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE}/${HOSTNAME} | grep role | \
+        while read ETCD_KEY; do
+          ROLE=$(etcdctl get ${ETCD_KEY})
+          DEVICE=$(echo ${ETCD_KEY%/*} | sed 's#.*/##')
+          #echo $ROLE
+          if [ "${ROLE}" == "${GLUSTER_ROLE}" ]; then
+            if lvscan | grep "/dev/${HARBOR_GLUSTER_VG}-${DEVICE}"
+              then
+              GLUSTER_BRICK_DEVS=$(ls /dev/${HARBOR_GLUSTER_VG}-${DEVICE}/)
+              for GLUSTER_BRICK in ${GLUSTER_BRICK_DEVS}; do
+                echo "brick: $GLUSTER_BRICK-${DEVICE}"
+                mkdir -p ${HARBOR_GLUSTER_MOUNT_DIR}/$GLUSTER_BRICK-${DEVICE}
+                mount /dev/${HARBOR_GLUSTER_VG}-${DEVICE}/${GLUSTER_BRICK} ${HARBOR_GLUSTER_MOUNT_DIR}/$GLUSTER_BRICK-${DEVICE}
+                mkdir -p ${HARBOR_GLUSTER_MOUNT_DIR}/$GLUSTER_BRICK-${DEVICE}/brick
+                etcdctl set /harboros/os-glusterfs/bricks/${GLUSTER_BRICK}/${HOSTNAME}/${DEVICE} ${GLUSTER_BRICK}-${DEVICE}
+              done
+            fi
+          fi
+        done
+  done
+}
+mount_gluster_vol_bricks

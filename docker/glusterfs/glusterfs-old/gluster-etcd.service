@@ -1,0 +1,12 @@
+[Unit]
+Description=update Skydns with GlusterFS Hosts
+After=network.target local-fs.target
+Before=gluster-mount-bricks.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/update-etcd.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

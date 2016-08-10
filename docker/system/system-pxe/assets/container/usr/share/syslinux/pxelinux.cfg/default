@@ -1,0 +1,20 @@
+default vesamenu.c32
+prompt 0
+timeout 30
+ontimeout deploy-node
+
+menu vshift 8
+
+label local
+menu label ^Boot: Local Disc
+localboot 0xffff
+
+label deploy-node
+menu label ^Deploy: HarborOS: Node
+kernel vmlinuz
+append initrd=initrd.img inst.kexec inst.stage2=http://installer.harboros.net:8013/installer/images ks={{PXE_HTTP_ADDR}}/node.ks inst.kexec
+
+label deploy-base
+menu label Deploy: HarborOS: ^Base
+kernel vmlinuz
+append initrd=initrd.img inst.stage2=http://installer.harboros.net:8013/installer/images

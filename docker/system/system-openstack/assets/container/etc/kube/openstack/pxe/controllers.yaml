@@ -1,0 +1,180 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pxe
+  namespace: os-pxe
+type: Opaque
+data:
+  host-ssh-user: {{HOST_SSH_USER}}
+  host-ssh-key: {{HOST_SSH_KEY}}
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: pxe
+    version: v0.1.0
+  name: pxe
+  namespace: os-pxe
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: pxe
+        version: v0.1.0
+      name: pxe
+      namespace: os-pxe
+    spec:
+      nodeSelector:
+        openstack-pxe: 'true'
+        arch: 'x86'
+      containers:
+        - name: pxe-server
+          image:  docker.io/port/system-pxe:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+          ports:
+            - containerPort: 67
+              hostPort: 67
+              name: dhcp
+              protocol: UDP
+            - containerPort: 68
+              hostPort: 68
+              name: bootp
+              protocol: UDP
+            - containerPort: 69
+              hostPort: 69
+              name: tftp
+              protocol: UDP
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            privileged: false
+            capabilities:
+              add:
+                - NET_ADMIN
+        - name: pxe-kickstarts
+          image:  docker.io/port/system-kickstart:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+          ports:
+            - containerPort: 79
+              name: http
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            privileged: false
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            privileged: false
+        - name: pxe-etcd
+          image:  docker.io/port/system-etcd:latest
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: pxe-etcd
+              mountPath: '/data'
+              readOnly: false
+          command:
+            - /bin/etcd
+            - --name=keystone-etcd
+            - --listen-peer-urls=http://127.0.0.1:701
+            - --listen-client-urls=http://0.0.0.0:401
+            - --advertise-client-urls=http://etcd.os-pxe.svc.{{OS_DOMAIN}}:401
+            - --data-dir=/data
+          ports:
+            - containerPort: 401
+              name: etcd
+              protocol: TCP
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: pxe
+        - name: pxe-etcd
+          hostPath:
+            path: /var/lib/harbor/os-pxe/etcd
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pxe-provisioner
+  namespace: os-pxe
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  host-ssh-user: {{HOST_SSH_USER}}
+  host-ssh-key-private: {{HOST_SSH_KEY_PRIVATE}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: pxe-provisioner
+    version: v0.1.0
+  name: pxe-provisioner
+  namespace: os-pxe
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: pxe-provisioner
+        version: v0.1.0
+      name: pxe-provisioner
+      namespace: os-pxe
+    spec:
+      nodeSelector:
+        openstack-pxe: 'true'
+        arch: 'x86'
+      containers:
+        - name: provisioner
+          image:  docker.io/port/system-provisioner:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: pxe-provisioner
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock

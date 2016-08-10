@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: undercloud-ovn
+    version: v0.1.0
+  name: undercloud-ovn
+  namespace: host-ovn
+spec:
+  hostNetwork: true
+  containers:
+  - name: undercloud-ovn-northd
+    image: docker.io/port/ovn:latest
+    env:
+      - name: OVS_NB_DB_IP
+        value: {{OVS_NB_DB_IP}}
+      - name: OVS_SB_DB_IP
+        value: {{OVS_SB_DB_IP}}
+    command:
+      - /start-northd.sh

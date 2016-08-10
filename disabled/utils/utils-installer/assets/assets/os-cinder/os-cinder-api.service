@@ -1,0 +1,30 @@
+[Unit]
+Description=HarborOS: OpenStack: cinder Service
+After=docker.service freeipa.service os-cinder-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=/var/usrlocal/bin/os-cinder-api-preflight.sh
+
+ExecStartPre=-/bin/kubectl delete -f /etc/os-cinder/kube/os-cinder-api_service.yaml --namespace=os-cinder
+ExecStartPre=-/bin/kubectl delete -f /etc/os-cinder/kube/os-cinder-api_replicationcontroller.yaml --namespace=os-cinder
+ExecStartPre=-/bin/kubectl delete -f /etc/os-cinder/kube/os-cinder_secrets.yaml --namespace=os-cinder
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=-/bin/kubectl create -f /etc/os-cinder/kube/os-cinder_namespace.yaml
+ExecStartPre=/bin/kubectl create -f /etc/os-cinder/kube/os-cinder_secrets.yaml --namespace=os-cinder
+ExecStartPre=/bin/kubectl create -f /etc/os-cinder/kube/os-cinder-api_replicationcontroller.yaml --namespace=os-cinder
+ExecStart=/bin/kubectl create -f /etc/os-cinder/kube/os-cinder-api_service.yaml --namespace=os-cinder
+
+ExecStop=-/bin/kubectl delete -f /etc/os-cinder/kube/os-cinder-api_service.yaml --namespace=os-cinder
+ExecStop=-/bin/kubectl delete -f /etc/os-cinder/kube/os-cinder-api_replicationcontroller.yaml --namespace=os-cinder
+ExecStop=-/bin/kubectl delete -f /etc/os-cinder/kube/os-cinder_secrets.yaml --namespace=os-cinder
+
+[Install]
+WantedBy=multi-user.target

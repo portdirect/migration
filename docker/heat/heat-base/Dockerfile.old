@@ -1,0 +1,48 @@
+FROM %%DOCKER_NAMESPACE%%/%%DOCKER_PREFIX%%base:%%DOCKER_TAG%%
+ENV OPENSTACK_COMPONENT="os-heat" \
+		INIT_DB_REQUIRED="True"
+
+RUN yum install -y \
+        git \
+        python-pip \
+        gcc \
+        python-devel \
+        postgresql-devel \
+        libffi-devel \
+        openssl \
+        openssl-devel \
+        libxml2-devel \
+        libxslt-devel && \
+    pip install --upgrade pip && \
+    git clone --depth 1 https://github.com/openstack/heat.git /opt/heat && \
+    pip install /opt/heat && \
+    pip install tox && \
+        mkdir -p /etc/heat && \
+          cd /opt/heat && \
+            tox -e genconfig && \
+    mkdir -p /etc/heat && \
+    /bin/cp -rf /opt/heat/etc/heat/* /etc/heat && \
+		export HEAT_GID="187" && \
+		export HEAT_UID="187" && \
+		export HEAT_USER="heat" && \
+		groupadd -g ${HEAT_GID} ${HEAT_USER} && \
+		useradd -u ${HEAT_UID} -g ${HEAT_GID} \
+				-c "${HEAT_USER} system user account" \
+				-d "/var/lib/${HEAT_USER}" \
+				--no-create-home \
+				-s '/sbin/nologin' ${HEAT_USER} && \
+		yum install -y \
+        httpd \
+        mod_wsgi \
+        mod_auth_kerb \
+        mod_ssl && \
+    rpm -e --nodeps centos-logos && \
+    yum clean all && \
+    rm -f /etc/httpd/conf.d/*.conf && \
+    sed -i 's/^Listen 80/#Listen 80/' /etc/httpd/conf/httpd.conf && \
+		pip install --upgrade oslo.i18n && \
+		pip install --upgrade wrapt && \
+		pip install --upgrade python-keystoneclient
+
+ADD ./assets /opt/harbor/assets
+RUN /bin/cp -rf /opt/harbor/assets/* /

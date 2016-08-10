@@ -1,0 +1,2 @@
+ssh -L 1936:192.168.21.70:1936 104.155.104.14
+ssh -M -S portdirect-master -fnNT -L 8080:localhost:8080 104.155.104.14

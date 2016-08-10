@@ -1,0 +1,197 @@
+#!/bin/sh
+set -e
+PATH=/usr/local/bin:${PATH}
+HOSTNAME=$(hostname -s)
+OS_DOMAIN=$(hostname -d)
+HARBOROS_ETCD_ROOT=/harboros
+SWIFT_ROLE=swift
+HARBOR_SWIFT_VG=swift
+
+echo "#########################################################################"
+echo "HarborOS: Storage Config: Swift: Prepping Swift Devices"
+echo "#########################################################################"
+for DISC_TYPE in ssd hdd; do
+  etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE} | grep role | \
+      while read ETCD_KEY; do
+        ROLE=$(etcdctl get ${ETCD_KEY})
+        if [ "${ROLE}" == "${SWIFT_ROLE}" ]; then
+          ETCD_KEY=${ETCD_KEY#"${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE}/"}
+          IFS='/' read SWIFT_HOST SWIFT_DEVICE <<< "${ETCD_KEY%/*}"
+          if [ "${SWIFT_HOST}" == "${HOSTNAME}" ]; then
+            pvdisplay /dev/${SWIFT_DEVICE}1 || (
+              parted  --script /dev/${SWIFT_DEVICE} mklabel GPT
+              parted  --script /dev/${SWIFT_DEVICE} mkpart primary 1MiB 100%
+              parted  --script /dev/${SWIFT_DEVICE} set 1 lvm on
+              pvcreate /dev/${SWIFT_DEVICE}1
+              pvdisplay /dev/${SWIFT_DEVICE}1
+            )
+
+            if vgscan | grep -q "${HARBOR_SWIFT_VG}-${SWIFT_DEVICE}"; then
+              vgdisplay ${HARBOR_SWIFT_VG}-${SWIFT_DEVICE}
+            else
+              vgcreate ${HARBOR_SWIFT_VG}-${SWIFT_DEVICE} /dev/${SWIFT_DEVICE}1
+              vgdisplay ${HARBOR_SWIFT_VG}-${SWIFT_DEVICE}
+            fi
+
+            if lvscan | grep "/dev/${HARBOR_SWIFT_VG}-${SWIFT_DEVICE}/${HARBOR_SWIFT_VG}-${SWIFT_DEVICE}"; then
+                echo "${HARBOR_SWIFT_VG}-${SWIFT_DEVICE} is prepped"
+            else
+              echo y | lvcreate -n ${HARBOR_SWIFT_VG}-${SWIFT_DEVICE} -l 100%FREE ${HARBOR_SWIFT_VG}-${SWIFT_DEVICE}
+              mkfs.xfs -L ${HARBOR_SWIFT_VG}-${SWIFT_DEVICE} -n ftype=1 /dev/${HARBOR_SWIFT_VG}-${SWIFT_DEVICE}/${HARBOR_SWIFT_VG}-${SWIFT_DEVICE}
+            fi
+
+            mkdir -p /mnt/swift/${SWIFT_DEVICE}
+            mountpoint -q /mnt/swift/${SWIFT_DEVICE} || mount \
+            --options noatime,nodiratime,nobarrier,logbufs=8  \
+            --source /dev/${HARBOR_SWIFT_VG}-${SWIFT_DEVICE}/${HARBOR_SWIFT_VG}-${SWIFT_DEVICE} \
+            --target /mnt/swift/${SWIFT_DEVICE}
+
+            chown 160:160 /mnt/swift/${SWIFT_DEVICE}
+            echo "${HARBOR_SWIFT_VG}-${SWIFT_DEVICE} is mounted at /mnt/swift/${SWIFT_DEVICE}"
+          fi
+        fi
+      done
+done
+
+
+#
+# : ${HARBOR_GLUSTER_VG:=harbor-gluster}
+#
+#
+# : ${HARBOR_GLUSTER_DATA_POOL:=gluster-pool}
+# : ${HARBOR_GLUSTER_DATA_POOL_SIZE:='90%FREE'}
+# : ${HARBOR_GLUSTER_DATA_METADATA_SIZE:=1G}
+#
+# HOSTNAME="$(hostname -s)"
+# HARBOROS_ETCD_ROOT="/harboros"
+# GLUSTER_ROLE="glusterfs"
+#
+# prep_gluster_devs () {
+#   for DISC_TYPE in ssd hdd; do
+#     etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE}/${HOSTNAME} | grep role | \
+#         while read ETCD_KEY; do
+#           ROLE=$(etcdctl get ${ETCD_KEY})
+#           DEVICE=$(echo ${ETCD_KEY%/*} | sed 's#.*/##')
+#           if [ "${ROLE}" == "${GLUSTER_ROLE}" ]; then
+#             echo "Identified ${DEVICE} as a gluster volume"
+#             # if the device is not ininitialzed as a lvm pv do that now
+#             pvdisplay /dev/${DEVICE}1 || (
+#               parted  --script /dev/${DEVICE} mklabel GPT
+#               parted  --script /dev/${DEVICE} mkpart primary 1MiB 100%
+#               parted  --script /dev/${DEVICE} set 1 lvm on
+#               pvcreate /dev/${DEVICE}1
+#               pvdisplay /dev/${DEVICE}1
+#             )
+#             if vgscan | grep -q "${HARBOR_GLUSTER_VG}-${DEVICE}"; then
+#               vgdisplay ${HARBOR_GLUSTER_VG}-${DEVICE}
+#             else
+#               vgcreate ${HARBOR_GLUSTER_VG}-${DEVICE} /dev/${DEVICE}1
+#               vgdisplay ${HARBOR_GLUSTER_VG}-${DEVICE}
+#             fi
+#
+#             if lvscan | grep "/dev/${HARBOR_GLUSTER_VG}-${DEVICE}/${HARBOR_GLUSTER_VG}-${DEVICE}"; then
+#                 echo "${HARBOR_GLUSTER_VG}-${DEVICE} is prepped"
+#             else
+#               echo y | lvcreate -n ${HARBOR_GLUSTER_VG}-${DEVICE}-metadata -L ${HARBOR_GLUSTER_DATA_METADATA_SIZE} ${HARBOR_GLUSTER_VG}-${DEVICE}
+#               lvcreate -n ${HARBOR_GLUSTER_VG}-${DEVICE} -l ${HARBOR_GLUSTER_DATA_POOL_SIZE} ${HARBOR_GLUSTER_VG}-${DEVICE}
+#               lvconvert --yes --type thin-pool --poolmetadata ${HARBOR_GLUSTER_VG}-${DEVICE}/${HARBOR_GLUSTER_VG}-${DEVICE}-metadata ${HARBOR_GLUSTER_VG}-${DEVICE}/${HARBOR_GLUSTER_VG}-${DEVICE}
+#             fi
+#           fi
+#         done
+#   done
+# }
+# prep_gluster_devs
+#
+#
+#
+# prep_var_lib_glusterd () {
+#   for DISC_TYPE in ssd hdd; do
+#     etcdctl ls --sort -recursive ${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE}/${HOSTNAME} | grep role | \
+#         while read ETCD_KEY; do
+#           ROLE=$(etcdctl get ${ETCD_KEY})
+#           DEVICE=$(echo ${ETCD_KEY%/*} | sed 's#.*/##')
+#           if [ "${ROLE}" == "${GLUSTER_ROLE}" ]; then
+#             ETCD_KEY=$(etcdctl ls --sort -recursive ${HARBOROS_ETCD_ROOT}/volumes/$(hostname -s) | head -1)
+#             GLUSTER_VOLUME_SIZE=$(etcdctl get ${ETCD_KEY})
+#             GLUSTER_VOLUME_NAME=$(basename ${ETCD_KEY%/} )
+#             echo $DEVICE var-lib-glusterd 20G
+#             if lvscan | grep "/dev/${HARBOR_GLUSTER_VG}-${DEVICE}/${HARBOR_GLUSTER_VG}-${DEVICE}"
+#               then
+#               ( lvdisplay ${HARBOR_GLUSTER_VG}-${DEVICE}/var-lib-glusterd ) || \
+#                 (
+#                   lvcreate -V20G -T ${HARBOR_GLUSTER_VG}-${DEVICE}/${HARBOR_GLUSTER_VG}-${DEVICE} -n var-lib-glusterd && \
+#                   mkfs.xfs -i size=512 /dev/${HARBOR_GLUSTER_VG}-${DEVICE}/var-lib-glusterd
+#                   lvdisplay ${HARBOR_GLUSTER_VG}-${DEVICE}/var-lib-glusterd
+#                 )
+#             fi
+#             umount /var/lib/glusterd || true
+#             mkdir -p /var/lib/glusterd
+#             mount /dev/${HARBOR_GLUSTER_VG}-${DEVICE}/var-lib-glusterd /var/lib/glusterd
+#
+#           fi
+#         done
+#   done
+# }
+# prep_var_lib_glusterd
+#
+#
+# prep_gluster_vol_bricks () {
+#   for DISC_TYPE in ssd hdd; do
+#     etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE}/${HOSTNAME} | grep role | \
+#         while read ETCD_KEY; do
+#           ROLE=$(etcdctl get ${ETCD_KEY})
+#           DEVICE=$(echo ${ETCD_KEY%/*} | sed 's#.*/##')
+#           if [ "${ROLE}" == "${GLUSTER_ROLE}" ]; then
+#             etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/volumes/$(hostname -s) | \
+#                 while read ETCD_KEY; do
+#                   GLUSTER_VOLUME_SIZE=$(etcdctl get ${ETCD_KEY})
+#                   GLUSTER_VOLUME_NAME=$(basename ${ETCD_KEY%/} )
+#                   echo $DEVICE $GLUSTER_VOLUME_NAME $GLUSTER_VOLUME_SIZE
+#                   if lvscan | grep "/dev/${HARBOR_GLUSTER_VG}-${DEVICE}/${HARBOR_GLUSTER_VG}-${DEVICE}"
+#                     then
+#                     ( lvdisplay ${HARBOR_GLUSTER_VG}-${DEVICE}/${GLUSTER_VOLUME_NAME} ) || \
+#                       (
+#                         lvcreate -V${GLUSTER_VOLUME_SIZE} -T ${HARBOR_GLUSTER_VG}-${DEVICE}/${HARBOR_GLUSTER_VG}-${DEVICE} -n ${GLUSTER_VOLUME_NAME} && \
+#                         mkfs.xfs -i size=512 /dev/${HARBOR_GLUSTER_VG}-${DEVICE}/${GLUSTER_VOLUME_NAME}
+#                         lvdisplay ${HARBOR_GLUSTER_VG}-${DEVICE}/${GLUSTER_VOLUME_NAME}
+#                       )
+#                   fi
+#                 done
+#           fi
+#         done
+#   done
+# }
+# prep_gluster_vol_bricks
+#
+#
+#
+# mount_gluster_vol_bricks () {
+#   for DISC_TYPE in ssd hdd; do
+#     etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/discs/${DISC_TYPE}/${HOSTNAME} | grep role | \
+#         while read ETCD_KEY; do
+#           ROLE=$(etcdctl get ${ETCD_KEY})
+#           DEVICE=$(echo ${ETCD_KEY%/*} | sed 's#.*/##')
+#           if [ "${ROLE}" == "${GLUSTER_ROLE}" ]; then
+#             etcdctl ls -recursive ${HARBOROS_ETCD_ROOT}/volumes/$(hostname -s) | \
+#                 while read ETCD_KEY; do
+#                   GLUSTER_VOLUME_SIZE=$(etcdctl get ${ETCD_KEY})
+#                   GLUSTER_VOLUME_NAME=$(basename ${ETCD_KEY%/} )
+#                   echo $DEVICE $GLUSTER_VOLUME_NAME $GLUSTER_VOLUME_SIZE
+#                   if lvscan | grep "/dev/${HARBOR_GLUSTER_VG}-${DEVICE}/${HARBOR_GLUSTER_VG}-${DEVICE}"
+#                     then
+#                     if mount | grep "/brick/${GLUSTER_VOLUME_NAME}/${DEVICE}"; then
+#                       echo "Filesystem already mounted at /var/lib/harbor/os-gluster/export/${GLUSTER_VOLUME_NAME}/${DEVICE} , not attempting to mount"
+#                     else
+#                       echo "Mounting /dev/${HARBOR_GLUSTER_VG}-${DEVICE}/${GLUSTER_VOLUME_NAME} @ /var/lib/harbor/os-gluster/export/${GLUSTER_VOLUME_NAME}/${DEVICE}"
+#                       mkdir -p /var/lib/harbor/os-gluster/export/${GLUSTER_VOLUME_NAME}/${DEVICE}
+#                       mount /dev/${HARBOR_GLUSTER_VG}-${DEVICE}/${GLUSTER_VOLUME_NAME} /var/lib/harbor/os-gluster/export/${GLUSTER_VOLUME_NAME}/${DEVICE}
+#                     fi
+#                     mkdir -p /var/lib/harbor/os-gluster/export/${GLUSTER_VOLUME_NAME}/${DEVICE}/brick
+#                   fi
+#                 done
+#           fi
+#         done
+#   done
+# }
+#
+# mount_gluster_vol_bricks

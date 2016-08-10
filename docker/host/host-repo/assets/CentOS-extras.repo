@@ -1,0 +1,7 @@
+[CentOS-extras]
+name=CentOS-7 - Extras
+mirrorlist=http://mirrorlist.centos.org/?release=7&arch=$basearch&repo=extras&infra=$infra
+#baseurl=http://mirror.centos.org/centos/7/extras/$basearch/
+gpgcheck=0
+gpgkey=http://mirror.centos.org/centos/7/os/x86_64/RPM-GPG-KEY-CentOS-7
+exclude=cloud-utils-growpart cockpit-storaged

@@ -1,0 +1,109 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rc
+      name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+    spec:
+      nodeSelector:
+        nova-compute: 'libvirt'
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/nova-compute:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: sys-fs-cgroup
+              mountPath: /sys/fs/cgroup
+              readOnly: false
+            - name: var-run-netns
+              mountPath: /var/run/netns
+              readOnly: false
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: host-dev
+              mountPath: /dev
+              readOnly: false
+            - name: host-run
+              mountPath: /run
+              readOnly: false
+            - name: pod-var-lib-nova
+              mountPath: /var/lib/nova
+              readOnly: false
+            - name: pod-var-lib-libvirt
+              mountPath: /var/lib/libvirt
+              readOnly: false
+            - name: pod-var-etc-libvirt-qemu
+              mountPath: /etc/libvirt/qemu
+              readOnly: false
+            - name: pod-glusterfs-mounts
+              mountPath: /usr/lib/python2.7/site-packages/mnt
+              readOnly: false
+          securityContext:
+            privileged: true
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-libvirt
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/nova-libvirt:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: sys-fs-cgroup
+              mountPath: /sys/fs/cgroup
+              readOnly: false
+            - name: var-run-netns
+              mountPath: /var/run/netns
+              readOnly: false
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: host-dev
+              mountPath: /dev
+              readOnly: false
+            - name: host-run
+              mountPath: /run
+              readOnly: false
+            - name: pod-var-lib-nova
+              mountPath: /var/lib/nova
+              readOnly: false
+            - name: pod-var-lib-libvirt
+              mountPath: /var/lib/libvirt
+              readOnly: false
+            - name: pod-var-etc-libvirt-qemu
+              mountPath: /etc/libvirt/qemu
+              readOnly: false
+            - name: pod-glusterfs-mounts
+              mountPath: /usr/lib/python2.7/site-packages/mnt
+              readOnly: false
+          securityContext:
+            privileged: true
+      hostNetwork: true
+      hostPID: true
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret
+        - name: sys-fs-cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+        - name: var-run-netns
+          hostPath:
+            path: /var/run/netns
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: host-dev
+          hostPath:
+            path: /dev
+        - name: host-run
+          hostPath:
+            path: /run
+        - name: pod-var-lib-nova
+        - name: pod-var-lib-libvirt
+        - name: pod-var-etc-libvirt-qemu
+        - name: pod-glusterfs-mounts

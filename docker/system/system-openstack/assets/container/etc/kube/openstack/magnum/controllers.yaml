@@ -1,0 +1,295 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: magnum-manager
+  namespace: os-magnum
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  magnum-keystone-user: {{MAGNUM_KEYSTONE_USER}}
+  magnum-keystone-password: {{MAGNUM_KEYSTONE_PASSWORD}}
+  magnum-db-name: {{MAGNUM_DB_NAME}}
+  magnum-db-user: {{MAGNUM_DB_USER}}
+  magnum-db-password: {{MAGNUM_DB_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: magnum-manager
+    version: v0.1.0
+  name: magnum-manager
+  namespace: os-magnum
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: magnum-manager
+        version: v0.1.0
+      name: magnum-manager
+      namespace: os-magnum
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: magnum-manager
+          image:  docker.io/port/magnum-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: magnum-manager
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: magnum
+  namespace: os-magnum
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  magnum-keystone-user: {{MAGNUM_KEYSTONE_USER}}
+  magnum-keystone-password: {{MAGNUM_KEYSTONE_PASSWORD}}
+  magnum-db-name: {{MAGNUM_DB_NAME}}
+  magnum-db-user: {{MAGNUM_DB_USER}}
+  magnum-db-password: {{MAGNUM_DB_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: magnum
+    version: v0.1.0
+  name: magnum
+  namespace: os-magnum
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: magnum
+        version: v0.1.0
+      name: magnum
+      namespace: os-magnum
+    spec:
+      nodeSelector:
+        openstack-magnum: 'true'
+        arch: 'x86'
+      containers:
+        - name: magnum-api
+          image: docker.io/port/magnum-api:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+        - name: magnum-memcached
+          image: docker.io/port/system-memcached:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "0.1"
+            limits:
+              memory: "64Mi"
+              cpu: "0.2"
+          securityContext:
+            privileged: false
+        - name: magnum-tls
+          image: docker.io/port/haproxy-ssl-terminator:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: LOCAL_HTTP_PORT
+              value: "8008"
+            - name: PUBLISH_HTTPS_PORT
+              value: "9511"
+          ports:
+          - containerPort: 9511
+            name: https
+            protocol: TCP
+          volumeMounts:
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: magnum
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: os-ssl
+          secret:
+            secretName: magnum-ssl-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: magnum-conductor
+  namespace: os-magnum
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  magnum-keystone-user: {{MAGNUM_KEYSTONE_USER}}
+  magnum-keystone-password: {{MAGNUM_KEYSTONE_PASSWORD}}
+  magnum-db-name: {{MAGNUM_DB_NAME}}
+  magnum-db-user: {{MAGNUM_DB_USER}}
+  magnum-db-password: {{MAGNUM_DB_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: magnum
+    version: v0.1.0
+  name: magnum-conductor
+  namespace: os-magnum
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: magnum-conductor
+        version: v0.1.0
+      name: magnum-conductor
+      namespace: os-magnum
+    spec:
+      nodeSelector:
+        openstack-magnum: 'true'
+        arch: 'x86'
+      containers:
+        - name: magnum-conductor
+          image: docker.io/port/magnum-conductor:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: magnum-conductor
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: os-ssl
+          secret:
+            secretName: magnum-ssl-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt

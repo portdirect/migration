@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: kuryr-raven
+    version: v0.1.0
+  name: kuryr-raven
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  containers:
+  - name: kuryr-raven
+    image: docker.io/port/system-raven:latest
+    env:
+      - name: SERVICE_CLUSTER_IP_RANGE
+        value: 10.10.0.0/24
+      - name: SERVICE_USER
+        value: admin
+      - name: SERVICE_TENANT_NAME
+        value: admin
+      - name: SERVICE_PASSWORD
+        value: password
+      - name: IDENTITY_URL
+        value: http://{{KEYSTONE_SERVICE_HOST}}:35357/v2.0
+      - name: OS_URL
+        value: http://{{NEUTRON_SERVICE_HOST}}:9696
+      - name: K8S_API
+        value: http://127.0.0.1:8080

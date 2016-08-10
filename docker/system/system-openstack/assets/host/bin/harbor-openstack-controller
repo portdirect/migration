@@ -1,0 +1,443 @@
+#!/bin/bash
+source /etc/openstack/openstack.env
+
+su ${HOST_SSH_USER} -c "bash -c \"echo n | ssh-keygen -t rsa -N \\\"\\\" -f ${HOST_SSH_KEY_LOC}\""
+
+#cat /etc/os-ssl/ca |  sed 's/\\r//g' | sed 's/\\n/\n/g'
+#cat /etc/os-ssl/cirt |  sed 's/\\r//g' | sed 's/\\n/\n/g'
+#cat /etc/os-ssl/key |  sed 's/\\r//g' | sed 's/\\n/\n/g'
+
+
+
+
+export PATH=$PATH:/usr/local/bin
+
+source /etc/openstack/openstack.env
+COMPONENTS="foreman ipsilon accounts loadbalancers etcd memcached glusterfs database messaging keystone glance neutron nova horizon heat murano cinder swift ceilometer gnocchi cloudkitty barbican magnum trove manila designate"
+
+
+
+: ${KUBE_PORT:=8080}
+: ${ETCD_PORT:=4001}
+KUBE_ENDPOINT="http://$(hostname -f):${KUBE_PORT}"
+CORE_ETCD_ENDPOINT="http://$(hostname -f):${ETCD_PORT}"
+OS_DOMAIN=$(hostname -d)
+
+KUBECTL=/usr/local/bin/kubectl
+HARBOR_DOCKER=/usr/local/bin/harbor-docker
+HOST_WORK_DIR=/tmp/openstack
+
+
+
+update_harbor_dist () {
+
+  ${HARBOR_DOCKER} kill openstack-install || true
+  ${HARBOR_DOCKER} rm -v openstack-install || true
+  rm -rf ${HOST_WORK_DIR} || true
+  mkdir -p ${HOST_WORK_DIR}
+  ${HARBOR_DOCKER} pull docker.io/port/system-openstack:latest
+  ${HARBOR_DOCKER} run -d --name openstack-install --net=host -v /etc/kube/openstack -v /:/host docker.io/port/system-openstack:latest tail -f /dev/null
+
+}
+
+
+
+
+load_harbor_services () {
+  for COMPONENT in $COMPONENTS
+  do
+    rm -rf ${HOST_WORK_DIR}/${COMPONENT}
+    ${HARBOR_DOCKER} exec openstack-install cp -rf /etc/kube/openstack/${COMPONENT} /host/${HOST_WORK_DIR}
+    ${KUBECTL} create -f ${HOST_WORK_DIR}/${COMPONENT}/namespace.yaml || true
+    sed -i "s,{{OS_DOMAIN}},${OS_DOMAIN}," ${HOST_WORK_DIR}/${COMPONENT}/services.yaml
+    ${KUBECTL} create -f ${HOST_WORK_DIR}/${COMPONENT}/services.yaml || true
+
+  done
+}
+
+
+
+
+
+
+
+
+prep_harbor_controller () {
+  COMPONENT=$1
+
+
+  ${KUBECTL} create -f ${HOST_WORK_DIR}/${COMPONENT}/namespace.yaml || true
+
+
+
+  sed -i "s,{{ETCDCTL_ENDPOINT}},http://etcd.os-etcd.svc.${OS_DOMAIN}:4001," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+
+
+
+  sed -i "s,{{OS_DOMAIN}},${OS_DOMAIN}," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{KUBE_ENDPOINT}},$( printf KUBE_ENDPOINT=${KUBE_ENDPOINT} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+
+  sed -i "s,{{PORTAL_SMTP_HOST}},$( printf PORTAL_SMTP_HOST=${PORTAL_SMTP_HOST} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{PORTAL_SMTP_PORT}},$( printf PORTAL_SMTP_PORT=${PORTAL_SMTP_PORT} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{PORTAL_SMTP_USER}},$( printf PORTAL_SMTP_USER=${PORTAL_SMTP_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{PORTAL_SMTP_PASS}},$( printf PORTAL_SMTP_PASS=${PORTAL_SMTP_PASS} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{PORTAL_DEFAULT_FROM_EMAIL}},$( printf PORTAL_DEFAULT_FROM_EMAIL=${PORTAL_DEFAULT_FROM_EMAIL} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{PORTAL_DEFAULT_ADMIN_EMAIL}},$( printf PORTAL_DEFAULT_ADMIN_EMAIL=${PORTAL_DEFAULT_ADMIN_EMAIL} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+
+  sed -i "s,{{IPA_USER_ADMIN_USER}},$( printf IPA_USER_ADMIN_USER=${IPA_USER_ADMIN_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPA_USER_ADMIN_PASSWORD}},$( printf IPA_USER_ADMIN_PASSWORD=${IPA_USER_ADMIN_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{IPA_HOST_ADMIN_USER}},$( printf IPA_HOST_ADMIN_USER=${IPA_HOST_ADMIN_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPA_HOST_ADMIN_PASSWORD}},$( printf IPA_HOST_ADMIN_PASSWORD=${IPA_HOST_ADMIN_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{IPA_DS_PASSWORD}},$( printf IPA_DS_PASSWORD=${IPA_DS_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+
+  sed -i "s,{{HOST_SSH_USER}},$( printf HOST_SSH_USER=${HOST_SSH_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{HOST_SSH_KEY}},$( printf HOST_SSH_KEY=$(cat ${HOST_SSH_KEY_LOC}.pub | base64 --wrap=0) | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{HOST_SSH_KEY_PRIVATE}},$( printf HOST_SSH_KEY_PRIVATE=$(cat ${HOST_SSH_KEY_LOC} | base64 --wrap=0) | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+
+
+  sed -i "s,{{DB_ROOT_PASSWORD}},$( printf DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MARIADB_DATABASE}},$( printf MARIADB_DATABASE=${MARIADB_DATABASE} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MARIADB_PASSWORD}},$( printf MARIADB_PASSWORD=${MARIADB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MARIADB_USER}},$( printf MARIADB_USER=${MARIADB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+
+  sed -i "s,{{MONGO_DB_NAME}},$( printf MONGO_DB_NAME=${MONGO_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MONGO_DB_PASSWORD}},$( printf MONGO_DB_PASSWORD=${MONGO_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MONGO_DB_USER}},$( printf MONGO_DB_USER=${MONGO_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+
+  sed -i "s,{{KEYSTONE_DB_NAME}},$( printf KEYSTONE_DB_NAME=${KEYSTONE_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{KEYSTONE_DB_USER}},$( printf KEYSTONE_DB_USER=${KEYSTONE_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{KEYSTONE_DB_PASSWORD}},$( printf KEYSTONE_DB_PASSWORD=${KEYSTONE_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{KEYSTONE_LDAP_USER}},$( printf KEYSTONE_LDAP_USER=${KEYSTONE_LDAP_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{KEYSTONE_LDAP_PASSWORD}},$( printf KEYSTONE_LDAP_PASSWORD=${KEYSTONE_LDAP_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{KEYSTONE_ADMIN_TOKEN}},$( printf KEYSTONE_ADMIN_TOKEN=${KEYSTONE_ADMIN_TOKEN} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{KEYSTONE_ADMIN_USER}},$( printf KEYSTONE_ADMIN_USER=${KEYSTONE_ADMIN_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{KEYSTONE_ADMIN_PROJECT}},$( printf KEYSTONE_ADMIN_PROJECT=${KEYSTONE_ADMIN_PROJECT} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{KEYSTONE_ADMIN_PASSWORD}},$( printf KEYSTONE_ADMIN_PASSWORD=${KEYSTONE_ADMIN_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{RABBITMQ_USER}},$( printf RABBITMQ_USER=${RABBITMQ_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{RABBITMQ_PASS}},$( printf RABBITMQ_PASS=${RABBITMQ_PASS} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{GLANCE_KEYSTONE_USER}},$( printf GLANCE_KEYSTONE_USER=${GLANCE_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GLANCE_KEYSTONE_PASSWORD}},$( printf GLANCE_KEYSTONE_PASSWORD=${GLANCE_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GLANCE_DB_NAME}},$( printf GLANCE_DB_NAME=${GLANCE_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GLANCE_DB_USER}},$( printf GLANCE_DB_USER=${GLANCE_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GLANCE_DB_PASSWORD}},$( printf GLANCE_DB_PASSWORD=${GLANCE_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{NEUTRON_KEYSTONE_USER}},$( printf NEUTRON_KEYSTONE_USER=${NEUTRON_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{NEUTRON_KEYSTONE_PASSWORD}},$( printf NEUTRON_KEYSTONE_PASSWORD=${NEUTRON_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{NEUTRON_DB_NAME}},$( printf NEUTRON_DB_NAME=${NEUTRON_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{NEUTRON_DB_USER}},$( printf NEUTRON_DB_USER=${NEUTRON_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{NEUTRON_DB_PASSWORD}},$( printf NEUTRON_DB_PASSWORD=${NEUTRON_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{NEUTRON_SHARED_SECRET}},$( printf NEUTRON_SHARED_SECRET=${NEUTRON_SHARED_SECRET} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{NOVA_KEYSTONE_USER}},$( printf NOVA_KEYSTONE_USER=${NOVA_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{NOVA_KEYSTONE_PASSWORD}},$( printf NOVA_KEYSTONE_PASSWORD=${NOVA_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{NOVA_DB_NAME}},$( printf NOVA_DB_NAME=${NOVA_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{NOVA_DB_USER}},$( printf NOVA_DB_USER=${NOVA_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{NOVA_DB_PASSWORD}},$( printf NOVA_DB_PASSWORD=${NOVA_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{NOVA_API_DB_NAME}},$( printf NOVA_API_DB_NAME=${NOVA_API_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+
+  sed -i "s,{{CINDER_KEYSTONE_USER}},$( printf CINDER_KEYSTONE_USER=${CINDER_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CINDER_KEYSTONE_PASSWORD}},$( printf CINDER_KEYSTONE_PASSWORD=${CINDER_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CINDER_DB_NAME}},$( printf CINDER_DB_NAME=${CINDER_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CINDER_DB_USER}},$( printf CINDER_DB_USER=${CINDER_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CINDER_DB_PASSWORD}},$( printf CINDER_DB_PASSWORD=${CINDER_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+
+  sed -i "s,{{HORIZON_DB_ROOT_PASSWORD}},$( printf DB_ROOT_PASSWORD=${HORIZON_DB_ROOT_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{HORIZON_MARIADB_DATABASE}},$( printf MARIADB_DATABASE=${HORIZON_MARIADB_DATABASE} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{HORIZON_MARIADB_PASSWORD}},$( printf MARIADB_PASSWORD=${HORIZON_MARIADB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{HORIZON_MARIADB_USER}},$( printf MARIADB_USER=${HORIZON_MARIADB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{HORIZON_DB_NAME}},$( printf HORIZON_DB_NAME=${HORIZON_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{HORIZON_DB_USER}},$( printf HORIZON_DB_USER=${HORIZON_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{HORIZON_DB_PASSWORD}},$( printf HORIZON_DB_PASSWORD=${HORIZON_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{HEAT_KEYSTONE_USER}},$( printf HEAT_KEYSTONE_USER=${HEAT_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{HEAT_KEYSTONE_PASSWORD}},$( printf HEAT_KEYSTONE_PASSWORD=${HEAT_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{HEAT_DB_NAME}},$( printf HEAT_DB_NAME=${HEAT_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{HEAT_DB_USER}},$( printf HEAT_DB_USER=${HEAT_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{HEAT_DB_PASSWORD}},$( printf HEAT_DB_PASSWORD=${HEAT_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{MURANO_KEYSTONE_USER}},$( printf MURANO_KEYSTONE_USER=${MURANO_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MURANO_KEYSTONE_PASSWORD}},$( printf MURANO_KEYSTONE_PASSWORD=${MURANO_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MURANO_DB_NAME}},$( printf MURANO_DB_NAME=${MURANO_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MURANO_DB_USER}},$( printf MURANO_DB_USER=${MURANO_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MURANO_DB_PASSWORD}},$( printf MURANO_DB_PASSWORD=${MURANO_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MURANO_RABBITMQ_USER}},$( printf MURANO_RABBITMQ_USER=${MURANO_RABBITMQ_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MURANO_RABBITMQ_PASS}},$( printf MURANO_RABBITMQ_PASS=${MURANO_RABBITMQ_PASS} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{SWIFT_KEYSTONE_USER}},$( printf SWIFT_KEYSTONE_USER=${SWIFT_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{SWIFT_KEYSTONE_PASSWORD}},$( printf SWIFT_KEYSTONE_PASSWORD=${SWIFT_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{SWIFT_DEVICE}},$( printf SWIFT_DEVICE=${SWIFT_DEVICE} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{SWIFT_HASH_PATH_PREFIX}},$( printf SWIFT_HASH_PATH_PREFIX=${SWIFT_HASH_PATH_PREFIX} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{SWIFT_HASH_PATH_SUFFIX}},$( printf SWIFT_HASH_PATH_SUFFIX=${SWIFT_HASH_PATH_SUFFIX} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+
+  sed -i "s,{{CORE_ETCD_ENDPOINT}},$( printf CORE_ETCD_ENDPOINT=${CORE_ETCD_ENDPOINT} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+
+  sed -i "s,{{LOADBALANCERS_FRONTEND_SSL_KEY}},${LOADBALANCERS_FRONTEND_SSL_KEY}," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{GLUSTERFS_DEVICE}},$( printf GLUSTERFS_DEVICE=${GLUSTERFS_DEVICE} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{CEILOMETER_KEYSTONE_USER}},$( printf CEILOMETER_KEYSTONE_USER=${CEILOMETER_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CEILOMETER_KEYSTONE_PASSWORD}},$( printf CEILOMETER_KEYSTONE_PASSWORD=${CEILOMETER_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CEILOMETER_METERING_SECRET}},$( printf CEILOMETER_METERING_SECRET=${CEILOMETER_METERING_SECRET} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CEILOMETER_DB_NAME}},$( printf CEILOMETER_DB_NAME=${CEILOMETER_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CEILOMETER_DB_USER}},$( printf CEILOMETER_DB_USER=${CEILOMETER_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CEILOMETER_DB_PASSWORD}},$( printf CEILOMETER_DB_PASSWORD=${CEILOMETER_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{GNOCCHI_KEYSTONE_USER}},$( printf GNOCCHI_KEYSTONE_USER=${GNOCCHI_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GNOCCHI_KEYSTONE_PASSWORD}},$( printf GNOCCHI_KEYSTONE_PASSWORD=${GNOCCHI_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GNOCCHI_DB_NAME}},$( printf GNOCCHI_DB_NAME=${GNOCCHI_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GNOCCHI_DB_USER}},$( printf GNOCCHI_DB_USER=${GNOCCHI_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GNOCCHI_DB_PASSWORD}},$( printf GNOCCHI_DB_PASSWORD=${GNOCCHI_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  # For now grafana is deployed in the gnocchi namespace
+  sed -i "s,{{GRAFANA_DB_NAME}},$( printf GRAFANA_DB_NAME=${GRAFANA_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GRAFANA_DB_USER}},$( printf GRAFANA_DB_USER=${GRAFANA_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GRAFANA_DB_PASSWORD}},$( printf GRAFANA_DB_PASSWORD=${GRAFANA_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GRAFANA_LDAP_USER}},$( printf GRAFANA_LDAP_USER=${GRAFANA_LDAP_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GRAFANA_LDAP_PASSWORD}},$( printf GRAFANA_LDAP_PASSWORD=${GRAFANA_LDAP_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GRAFANA_SECRET_KEY}},$( printf GRAFANA_SECRET_KEY=${GRAFANA_SECRET_KEY} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GRAFANA_SMTP_HOST}},$( printf GRAFANA_SMTP_HOST=${GRAFANA_SMTP_HOST} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GRAFANA_SMTP_PORT}},$( printf GRAFANA_SMTP_PORT=${GRAFANA_SMTP_PORT} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GRAFANA_SMTP_USER}},$( printf GRAFANA_SMTP_USER=${GRAFANA_SMTP_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GRAFANA_SMTP_PASS}},$( printf GRAFANA_SMTP_PASS=${GRAFANA_SMTP_PASS} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GRAFANA_DEFAULT_FROM_EMAIL}},$( printf GRAFANA_DEFAULT_FROM_EMAIL=${GRAFANA_DEFAULT_FROM_EMAIL} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{GRAFANA_DEFAULT_ADMIN_EMAIL}},$( printf GRAFANA_DEFAULT_ADMIN_EMAIL=${GRAFANA_DEFAULT_ADMIN_EMAIL} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{CLOUDKITTY_KEYSTONE_USER}},$( printf CLOUDKITTY_KEYSTONE_USER=${CLOUDKITTY_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CLOUDKITTY_KEYSTONE_PASSWORD}},$( printf CLOUDKITTY_KEYSTONE_PASSWORD=${CLOUDKITTY_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CLOUDKITTY_FREEIPA_USER}},$( printf CLOUDKITTY_FREEIPA_USER=${CLOUDKITTY_FREEIPA_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CLOUDKITTY_FREEIPA_PASSWORD}},$( printf CLOUDKITTY_FREEIPA_PASSWORD=${CLOUDKITTY_FREEIPA_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CLOUDKITTY_DB_NAME}},$( printf CLOUDKITTY_DB_NAME=${CLOUDKITTY_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CLOUDKITTY_DB_USER}},$( printf CLOUDKITTY_DB_USER=${CLOUDKITTY_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{CLOUDKITTY_DB_PASSWORD}},$( printf CLOUDKITTY_DB_PASSWORD=${CLOUDKITTY_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{BARBICAN_KEYSTONE_USER}},$( printf BARBICAN_KEYSTONE_USER=${BARBICAN_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{BARBICAN_KEYSTONE_PASSWORD}},$( printf BARBICAN_KEYSTONE_PASSWORD=${BARBICAN_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{BARBICAN_DB_NAME}},$( printf BARBICAN_DB_NAME=${BARBICAN_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{BARBICAN_DB_USER}},$( printf BARBICAN_DB_USER=${BARBICAN_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{BARBICAN_DB_PASSWORD}},$( printf BARBICAN_DB_PASSWORD=${BARBICAN_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{MAGNUM_KEYSTONE_USER}},$( printf MAGNUM_KEYSTONE_USER=${MAGNUM_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MAGNUM_KEYSTONE_PASSWORD}},$( printf MAGNUM_KEYSTONE_PASSWORD=${MAGNUM_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MAGNUM_DB_NAME}},$( printf MAGNUM_DB_NAME=${MAGNUM_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MAGNUM_DB_USER}},$( printf MAGNUM_DB_USER=${MAGNUM_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MAGNUM_DB_PASSWORD}},$( printf MAGNUM_DB_PASSWORD=${MAGNUM_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{TROVE_KEYSTONE_USER}},$( printf TROVE_KEYSTONE_USER=${TROVE_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{TROVE_KEYSTONE_PASSWORD}},$( printf TROVE_KEYSTONE_PASSWORD=${TROVE_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{TROVE_DB_NAME}},$( printf TROVE_DB_NAME=${TROVE_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{TROVE_DB_USER}},$( printf TROVE_DB_USER=${TROVE_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{TROVE_DB_PASSWORD}},$( printf TROVE_DB_PASSWORD=${TROVE_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{TROVE_RABBITMQ_USER}},$( printf TROVE_RABBITMQ_USER=${TROVE_RABBITMQ_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{TROVE_RABBITMQ_PASS}},$( printf TROVE_RABBITMQ_PASS=${TROVE_RABBITMQ_PASS} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{MANILA_KEYSTONE_USER}},$( printf MANILA_KEYSTONE_USER=${MANILA_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MANILA_KEYSTONE_PASSWORD}},$( printf MANILA_KEYSTONE_PASSWORD=${MANILA_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MANILA_DB_NAME}},$( printf MANILA_DB_NAME=${MANILA_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MANILA_DB_USER}},$( printf MANILA_DB_USER=${MANILA_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{MANILA_DB_PASSWORD}},$( printf MANILA_DB_PASSWORD=${MANILA_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{DESIGNATE_KEYSTONE_USER}},$( printf DESIGNATE_KEYSTONE_USER=${DESIGNATE_KEYSTONE_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{DESIGNATE_KEYSTONE_PASSWORD}},$( printf DESIGNATE_KEYSTONE_PASSWORD=${DESIGNATE_KEYSTONE_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{DESIGNATE_DB_NAME}},$( printf DESIGNATE_DB_NAME=${DESIGNATE_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{DESIGNATE_DB_USER}},$( printf DESIGNATE_DB_USER=${DESIGNATE_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{DESIGNATE_DB_PASSWORD}},$( printf DESIGNATE_DB_PASSWORD=${DESIGNATE_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{DESIGNATE_POOL_DB_NAME}},$( printf DESIGNATE_POOL_DB_NAME=${DESIGNATE_POOL_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{DESIGNATE_POOL_DB_USER}},$( printf DESIGNATE_POOL_DB_USER=${DESIGNATE_POOL_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{DESIGNATE_POOL_DB_PASSWORD}},$( printf DESIGNATE_POOL_DB_PASSWORD=${DESIGNATE_POOL_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{DESIGNATE_PDNS_DB_NAME}},$( printf DESIGNATE_PDNS_DB_NAME=${DESIGNATE_PDNS_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{DESIGNATE_PDNS_DB_USER}},$( printf DESIGNATE_PDNS_DB_USER=${DESIGNATE_PDNS_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{DESIGNATE_PDNS_DB_PASSWORD}},$( printf DESIGNATE_PDNS_DB_PASSWORD=${DESIGNATE_PDNS_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+
+  sed -i "s,{{FOREMAN_DB_NAME}},$( printf FOREMAN_DB_NAME=${FOREMAN_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{FOREMAN_DB_USER}},$( printf FOREMAN_DB_USER=${FOREMAN_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{FOREMAN_DB_PASSWORD}},$( printf FOREMAN_DB_PASSWORD=${FOREMAN_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{FOREMAN_OAUTH_KEY}},$( printf FOREMAN_OAUTH_KEY=${FOREMAN_OAUTH_KEY} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{FOREMAN_OAUTH_SECRET}},$( printf FOREMAN_OAUTH_SECRET=${FOREMAN_OAUTH_SECRET} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{FOREMAN_SMTP_HOST}},$( printf FOREMAN_SMTP_HOST=${FOREMAN_SMTP_HOST} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{FOREMAN_SMTP_PORT}},$( printf FOREMAN_SMTP_PORT=${FOREMAN_SMTP_PORT} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{FOREMAN_SMTP_USER}},$( printf FOREMAN_SMTP_USER=${FOREMAN_SMTP_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{FOREMAN_SMTP_PASS}},$( printf FOREMAN_SMTP_PASS=${FOREMAN_SMTP_PASS} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{FOREMAN_DEFAULT_FROM_EMAIL}},$( printf FOREMAN_DEFAULT_FROM_EMAIL=${FOREMAN_DEFAULT_FROM_EMAIL} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{FOREMAN_DEFAULT_ADMIN_EMAIL}},$( printf FOREMAN_DEFAULT_ADMIN_EMAIL=${FOREMAN_DEFAULT_ADMIN_EMAIL} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+
+  sed -i "s,{{IPSILON_DB_ROOT_NAME}},$( printf IPSILON_DB_ROOT_NAME=${IPSILON_DB_ROOT_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_DB_ROOT_USER}},$( printf IPSILON_DB_ROOT_USER=${IPSILON_DB_ROOT_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_DB_ROOT_PASSWORD}},$( printf IPSILON_DB_ROOT_PASSWORD=${IPSILON_DB_ROOT_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{IPSILON_DB_ROOT_NAME_PLAIN}},${IPSILON_DB_ROOT_NAME}," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_DB_ROOT_USER_PLAIN}},${IPSILON_DB_ROOT_USER}," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_DB_ROOT_PASSWORD_PLAIN}},${IPSILON_DB_ROOT_PASSWORD}," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+  sed -i "s,{{IPSILON_DB_NAME}},$( printf IPSILON_DB_NAME=${IPSILON_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_DB_USER}},$( printf IPSILON_DB_USER=${IPSILON_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_DB_PASSWORD}},$( printf IPSILON_DB_PASSWORD=${IPSILON_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_ADMIN_DB_NAME}},$( printf IPSILON_ADMIN_DB_NAME=${IPSILON_ADMIN_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_ADMIN_DB_USER}},$( printf IPSILON_ADMIN_DB_USER=${IPSILON_ADMIN_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_ADMIN_DB_PASSWORD}},$( printf IPSILON_ADMIN_DB_PASSWORD=${IPSILON_ADMIN_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_USERS_DB_NAME}},$( printf IPSILON_USERS_DB_NAME=${IPSILON_USERS_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_USERS_DB_USER}},$( printf IPSILON_USERS_DB_USER=${IPSILON_USERS_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_USERS_DB_PASSWORD}},$( printf IPSILON_USERS_DB_PASSWORD=${IPSILON_USERS_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_TRANS_DB_NAME}},$( printf IPSILON_TRANS_DB_NAME=${IPSILON_TRANS_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_TRANS_DB_USER}},$( printf IPSILON_TRANS_DB_USER=${IPSILON_TRANS_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_TRANS_DB_PASSWORD}},$( printf IPSILON_TRANS_DB_PASSWORD=${IPSILON_TRANS_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_SAMLSESSION_DB_NAME}},$( printf IPSILON_SAMLSESSION_DB_NAME=${IPSILON_SAMLSESSION_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_SAMLSESSION_DB_USER}},$( printf IPSILON_SAMLSESSION_DB_USER=${IPSILON_SAMLSESSION_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_SAMLSESSION_DB_PASSWORD}},$( printf IPSILON_SAMLSESSION_DB_PASSWORD=${IPSILON_SAMLSESSION_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_SAML2SESSION_DB_NAME}},$( printf IPSILON_SAML2SESSION_DB_NAME=${IPSILON_SAML2SESSION_DB_NAME} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_SAML2SESSION_DB_USER}},$( printf IPSILON_SAML2SESSION_DB_USER=${IPSILON_SAML2SESSION_DB_USER} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  sed -i "s,{{IPSILON_SAML2SESSION_DB_PASSWORD}},$( printf IPSILON_SAML2SESSION_DB_PASSWORD=${IPSILON_SAML2SESSION_DB_PASSWORD} | base64 --wrap=0 )," ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+
+  cat ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+
+}
+
+
+load_harbor_controller () {
+  COMPONENT=$1
+  prep_harbor_controller ${COMPONENT}
+  ${KUBECTL} create -f ${HOST_WORK_DIR}/${COMPONENT}/namespace.yaml || true
+  KUBE_NODES=$(kubectl get nodes --no-headers| awk -F ' ' '{print $1}')
+  for KUBE_NODE in $KUBE_NODES
+  do
+    ${KUBECTL} label --overwrite node ${KUBE_NODE} openstack-${COMPONENT}='true'
+  done
+  ${KUBECTL} create -f ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+}
+
+unload_harbor_controller () {
+  COMPONENT=$1
+  rm -rf ${HOST_WORK_DIR}/${COMPONENT}
+  ${HARBOR_DOCKER} exec openstack-install cp -rf /etc/kube/openstack/${COMPONENT} /host/${HOST_WORK_DIR}/
+  prep_harbor_controller ${COMPONENT}
+  ${KUBECTL} delete -f ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  kubectl get secrets --namespace=os-${COMPONENT} --no-headers --output=name | xargs kubectl delete --namespace=os-${COMPONENT}
+
+}
+
+
+reload_harbor_controller () {
+  COMPONENT=$1
+    rm -rf ${HOST_WORK_DIR}/${COMPONENT}
+    ${HARBOR_DOCKER} exec openstack-install cp -rf /etc/kube/openstack/${COMPONENT} /host/${HOST_WORK_DIR}/
+
+
+  prep_harbor_controller ${COMPONENT}
+  ${KUBECTL} delete -f ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+  kubectl get secrets --namespace=os-${COMPONENT} --no-headers --output=name | xargs kubectl delete --namespace=os-${COMPONENT}
+  ${KUBECTL} create -f ${HOST_WORK_DIR}/${COMPONENT}/namespace.yaml || true
+  KUBE_NODES=$(kubectl get nodes --no-headers| awk -F ' ' '{print $1}')
+  for KUBE_NODE in $KUBE_NODES
+  do
+    ${KUBECTL} label --overwrite node ${KUBE_NODE} openstack-${COMPONENT}='true'
+  done
+  ${KUBECTL} create -f ${HOST_WORK_DIR}/${COMPONENT}/controllers.yaml
+}
+
+update_harbor_dist
+
+load_harbor_services
+
+
+reload_harbor_controller etcd
+reload_harbor_controller memcached
+reload_harbor_controller loadbalancers
+reload_harbor_controller ipsilon
+${KUBECTL} label --overwrite node $(hostname -f) openstack-database='true'
+
+reload_harbor_controller database
+reload_harbor_controller foreman
+
+
+
+reload_harbor_controller keystone
+reload_harbor_controller accounts
+
+reload_harbor_controller messaging
+
+
+#reload_harbor_controller pxe
+# Get some nodes up and running
+# Setup initial storage
+reload_harbor_controller glusterfs
+# finalise storage
+reload_harbor_controller swift
+
+reload_harbor_controller barbican
+
+reload_harbor_controller glance
+reload_harbor_controller neutron
+reload_harbor_controller nova
+reload_harbor_controller horizon
+reload_harbor_controller cinder
+reload_harbor_controller heat
+reload_harbor_controller gnocchi
+reload_harbor_controller ceilometer
+reload_harbor_controller designate
+reload_harbor_controller murano
+reload_harbor_controller manila
+reload_harbor_controller trove
+reload_harbor_controller magnum
+reload_harbor_controller cloudkitty
+
+
+
+unload_harbor_controller keystone; \
+reload_harbor_controller ipsilon && \
+sleep 20 && \
+reload_harbor_controller keystone && \
+sleep 60 && \
+reload_harbor_controller horizon
+
+
+load_harbor_controllers () {
+  KUBE_NODES=$(kubectl get nodes --no-headers| awk -F ' ' '{print $1}')
+  for KUBE_NODE in $KUBE_NODES
+  do
+    ${KUBECTL} label --overwrite node ${KUBE_NODE} arch='x86'
+    ${KUBECTL} label --overwrite node ${KUBE_NODE} neutron-agent='true'
+    ${KUBECTL} label --overwrite node ${KUBE_NODE} cinder-backend='lvm'
+    ${KUBECTL} label --overwrite node ${KUBE_NODE} compute-hypervisor='docker'
+    ${KUBECTL} label --overwrite node ${KUBE_NODE} openstack-loadbalancers='true'
+  done
+  ${KUBECTL} label --overwrite node $(hostname -f) neutron-services='true'
+  ${KUBECTL} label --overwrite node $(hostname -f) neutron-router='true'
+  ${KUBECTL} label --overwrite node $(hostname -f) compute-hypervisor='docker'
+  ${KUBECTL} label --overwrite node $(hostname -f) glusterfs='true'
+}
+load_harbor_controllers
+
+
+${KUBECTL} label --overwrite node ${KUBE_NODE} compute-hypervisor='libvirt'
+
+mark_system_arch () {
+  KUBE_NODES=$(kubectl get nodes --no-headers| awk -F ' ' '{print $1}')
+  for KUBE_NODE in $KUBE_NODES
+  do
+    ${KUBECTL} label --overwrite node ${KUBE_NODE} arch='x86'
+    ${KUBECTL} label --overwrite node ${KUBE_NODE} neutron-agent='true'
+    ${KUBECTL} label --overwrite node ${KUBE_NODE} compute-hypervisor='lxd'
+  done
+}
+mark_system_arch
+
+
+${KUBECTL} label --overwrite node 10-fe-ed-08-3c-58.port.direct compute-hypervisor=docker

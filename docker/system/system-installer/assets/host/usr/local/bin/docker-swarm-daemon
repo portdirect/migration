@@ -1,0 +1,24 @@
+#!/bin/bash
+set -e
+PATH=${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+
+docker stop swarm-node || true
+docker kill swarm-node || true
+docker rm -v swarm-node || true
+
+exec docker run \
+      -d \
+      --restart=always \
+      --name swarm-node \
+      --net=host \
+      -v /etc/harbor/auth/host/ca.crt:/etc/harbor/auth/host/ca.crt:ro \
+      -v /etc/harbor/auth/host/host.crt:/etc/harbor/auth/host/host.crt:ro \
+      -v /etc/harbor/auth/host/host.key:/etc/harbor/auth/host/host.key:ro \
+      docker.io/port/system-swarm:latest \
+          join \
+          --advertise=$(hostname -s).${OS_DOMAIN}:2375 \
+          --discovery-opt "kv.cacertfile=/etc/harbor/auth/host/ca.crt" \
+          --discovery-opt "kv.certfile=/etc/harbor/auth/host/host.crt" \
+          --discovery-opt "kv.keyfile=/etc/harbor/auth/host/host.key" \
+          etcd://etcd-docker.${OS_DOMAIN}:4003

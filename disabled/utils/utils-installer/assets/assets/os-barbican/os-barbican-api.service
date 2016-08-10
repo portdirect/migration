@@ -1,0 +1,29 @@
+[Unit]
+Description=HarborOS: OpenStack: barbican Service
+After=docker.service freeipa.service os-barbican-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=/var/usrlocal/bin/os-barbican-api-preflight.sh
+
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-barbican/kube/os-barbican-api_service.yaml --namespace=os-barbican
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-barbican/kube/os-barbican-api_replicationcontroller.yaml --namespace=os-barbican
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-barbican/kube/os-barbican_secrets.yaml --namespace=os-barbican
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-barbican/kube/os-barbican_secrets.yaml --namespace=os-barbican
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-barbican/kube/os-barbican-api_replicationcontroller.yaml --namespace=os-barbican
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-barbican/kube/os-barbican-api_service.yaml --namespace=os-barbican
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-barbican/kube/os-barbican-api_service.yaml --namespace=os-barbican
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-barbican/kube/os-barbican-api_replicationcontroller.yaml --namespace=os-barbican
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-barbican/kube/os-barbican_secrets.yaml --namespace=os-barbican
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,18 @@
+#!/bin/bash
+
+source /etc/openstack/openstack.env
+
+KUBECTL=/usr/local/bin/kubectl
+HARBOR_DOCKER=/usr/local/bin/harbor-docker
+HOST_WORK_DIR=/tmp/openstack
+
+${KUBECTL} label --overwrite node $(hostname --fqdn) openstack-manager='true'
+
+label_node_arch () {
+  KUBE_NODES=$(kubectl get nodes --no-headers| awk -F ' ' '{print $1}')
+  for KUBE_NODE in $KUBE_NODES
+  do
+    kubectl label --overwrite node ${KUBE_NODE} arch='x86'
+  done
+}
+label_node_arch

@@ -1,0 +1,6 @@
+{
+    "name": "haproxy",
+    "reloadCmd": "/usr/bin/haproxy_reload",
+    "config": "/tmp/haproxy.cfg",
+    "template": "/etc/kube2lb/template.cfg"
+}

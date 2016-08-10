@@ -1,0 +1,20 @@
+#!/bin/bash
+source /etc/harbor/network.env
+
+# Update the hosts file to point to docker1 ip addr
+HOST_DOCKER_IP=$(ip -f inet -o addr show docker1|cut -d\  -f 7 | cut -d/ -f 1)
+/usr/bin/kinit -k -t /etc/krb5.keytab host/$(hostname -s).${OS_DOMAIN}
+
+cat > /tmp/nsupdate.txt <<EOF
+zone ${OS_DOMAIN}.
+update delete $(hostname -s).${OS_DOMAIN}. IN A
+send
+update add $(hostname -s).${OS_DOMAIN}. 1200 IN A ${HOST_DOCKER_IP}
+send
+EOF
+
+/usr/bin/nsupdate -g /tmp/nsupdate.txt
+
+/usr/bin/kdestroy -A
+
+rm -f /tmp/nsupdate.txt

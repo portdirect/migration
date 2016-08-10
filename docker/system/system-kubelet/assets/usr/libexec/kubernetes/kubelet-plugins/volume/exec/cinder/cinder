@@ -1,0 +1,186 @@
+#!/bin/bash
+
+# Copyright 2015 The Kubernetes Authors.
+# Copyright 2016 Pete Birley.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Notes:
+#  - Please install "jq" package before using this driver.
+#  - Docker must be running with support for shared mounts,
+#    this diver is only tested with docker>=v1.12.
+#  - This driver requires that a config file be present at
+#    /etc/harbor/auth-cinder.env, with keystone credentials
+#    for accessing cinder
+
+
+usage() {
+  err "Invalid usage. Usage: "
+  err "\t$0 init"
+  err "\t$0 attach <json params>"
+  err "\t$0 detach <mount device>"
+  err "\t$0 mount <mount dir> <mount device> <json params>"
+  err "\t$0 unmount <mount dir>"
+  exit 1
+}
+
+err() {
+  echo -ne $* 1>&2
+}
+
+log() {
+  echo -ne $* >&1
+}
+
+client_container () {
+CONTROLLER_IP=$(ip -f inet -o addr show eth0|cut -d\  -f 7 | cut -d/ -f 1)
+
+docker run -t --rm \
+  --net=host \
+  --privileged \
+  -e EXPOSED_IP=${CONTROLLER_IP} \
+  -e OS_REGION_NAME="RegionOne" \
+  -e OS_PROJECT_NAME="admin" \
+  -e OS_PROJECT_DOMAIN_NAME="Default" \
+  -e OS_USER_DOMAIN_NAME="Default" \
+  -e OS_IDENTITY_API_VERSION="3" \
+  -e OS_PASSWORD="password" \
+  -e OS_AUTH_URL="http://${CONTROLLER_IP}:35357/v3" \
+  -e OS_USERNAME="admin" \
+  -v /:/rootfs:shared \
+  -v /dev:/dev:rw \
+  docker.io/port/undercloud-cinderclient "$@"
+}
+
+ismounted() {
+  MOUNT=$(client_container findmnt -n ${MNTPATH} 2>/dev/null | cut -d' ' -f1)
+  if [ "${MOUNT}" == "${MNTPATH}" ]; then
+    echo "1"
+  else
+    echo "0"
+  fi
+}
+
+attach() {
+  VOLUMENAME=$(echo $1 | jq -r '.volumeName')
+  SIZE=$(echo $1 | jq -r '.size')
+
+  (client_container cinder show $VOLUMENAME || client_container cinder create --name $VOLUMENAME $SIZE) &> /dev/null
+  VOL_ID=$(client_container cinder show $VOLUMENAME | grep ' id ' | awk '{ print $4}')
+
+  (client_container mkdir -p /var/mnt/${VOL_ID} )&> /dev/null
+  (client_container cinder --debug local-detach ${VOL_ID} || true )&> /dev/null
+  ATTACHED_DEV=$(client_container cinder --debug local-attach --mountpoint /var/mnt/${VOL_ID} ${VOL_ID} | grep ' path ' | awk '{ print $4}')
+
+  ATTACH_STATUS=$(client_container /bin/bash -c "if [ ! -b \"${ATTACHED_DEV}\" ]; then echo 'FAILED'; else echo 'ACTIVE'; fi")
+  if [ "${ATTACH_STATUS}" == "FAILED" ]; then
+    err "{\"status\": \"Failure\", \"message\": \"Volume ${VOLUMENAME} could not be attached to the node\"}"
+    exit 1
+  fi
+  log "{\"status\": \"Success\", \"device\":\"${ATTACHED_DEV}\"}"
+  exit 0
+}
+
+detach() {
+  ATTACHED_DEV=$1
+  VOL_ID=$(echo $ATTACHED_DEV | awk -F '/dev/disk/by-path/' '{ print $2}' | awk -F ':volume-' '{ print $2}' | awk -F '-lun' '{ print $1}')
+  (client_container cinder --debug local-detach ${VOL_ID} || true )&> /dev/null
+  log "{\"status\": \"Success\"}"
+  exit 0
+}
+
+domount() {
+  MNTPATH=$1
+  ATTACHED_DEV=$2
+  FSTYPE=$(echo $3|jq -r '.["kubernetes.io/fsType"]')
+
+  ATTACH_STATUS=$(client_container /bin/bash -c "if [ ! -b \"${ATTACHED_DEV}\" ]; then echo 'FAILED'; else echo 'ACTIVE'; fi")
+  if [ "${ATTACH_STATUS}" == "FAILED" ]; then
+    err "{\"status\": \"Failure\", \"message\": \"Volume ${VOLUMENAME} could not be attached to the node\"}"
+    exit 1
+  fi
+
+  if [ $(ismounted) -eq 1 ] ; then
+    log "{\"status\": \"Success\"}"
+    exit 0
+  fi
+
+  VOLFSTYPE=$(client_container blkid -o udev ${ATTACHED_DEV} 2>/dev/null|grep "ID_FS_TYPE"|cut -d"=" -f2)
+  if [ "${VOLFSTYPE}" == "" ]; then
+    client_container mkfs -t ${FSTYPE} ${ATTACHED_DEV} >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+      err "{ \"status\": \"Failure\", \"message\": \"Failed to create fs ${FSTYPE} on device ${ATTACHED_DEV}\"}"
+      exit 1
+    fi
+  fi
+
+  client_container mkdir -p /rootfs${MNTPATH} &> /dev/null
+
+  client_container mount ${ATTACHED_DEV} /rootfs${MNTPATH} &> /dev/null
+  if [ $? -ne 0 ]; then
+    err "{ \"status\": \"Failure\", \"message\": \"Failed to mount device ${ATTACHED_DEV} at ${MNTPATH}\"}"
+    exit 1
+  fi
+  log "{\"status\": \"Success\"}"
+  exit 0
+}
+
+unmount() {
+  MNTPATH=$1
+  if [ $(ismounted) -eq 0 ] ; then
+    log "{\"status\": \"Success\"}"
+    exit 0
+  fi
+
+  client_container umount /rootfs${MNTPATH} &> /dev/null
+  if [ $? -ne 0 ]; then
+    err "{ \"status\": \"Failed\", \"message\": \"Failed to unmount volume at ${MNTPATH}\"}"
+    exit 1
+  fi
+  client_container rmdir /rootfs${MNTPATH} &> /dev/null
+
+  log "{\"status\": \"Success\"}"
+  exit 0
+}
+
+op=$1
+
+if [ "$op" = "init" ]; then
+  log "{\"status\": \"Success\"}"
+  exit 0
+fi
+
+if [ $# -lt 2 ]; then
+  usage
+fi
+
+shift
+
+case "$op" in
+  attach)
+    attach $*
+    ;;
+  detach)
+    detach $*
+    ;;
+  mount)
+    domount $*
+    ;;
+  unmount)
+    unmount $*
+    ;;
+  *)
+    usage
+esac
+
+exit 1

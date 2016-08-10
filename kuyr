@@ -1,0 +1,393 @@
+
+yum install -y etcd kubernetes-master kubernetes-node kubernetes-client
+
+
+
+################################################################################
+echo "${OS_DISTRO}: OVS"
+################################################################################
+
+cat > /etc/systemd/system/openvswitch-nonetwork.service <<EOF
+[Unit]
+Description=Open vSwitch Internal Unit
+After=syslog.target docker.service
+Requires=docker.service
+PartOf=openvswitch.service
+Wants=openvswitch.service
+
+[Service]
+Restart=always
+RestartSec=10
+RemainAfterExit=yes
+ExecStartPre=/usr/local/bin/openvswitch-start
+ExecStart=/usr/bin/echo "Open vSwitch Started"
+ExecStartStop=/usr/local/bin/openvswitch-stop
+EOF
+
+cat > /usr/local/bin/openvswitch-start << EOF
+#!/bin/bash
+setenforce 0
+
+modprobe libcrc32c
+modprobe nf_conntrack_ipv6
+modprobe nf_nat_ipv6
+modprobe gre
+modprobe openvswitch
+modprobe vport-geneve
+
+docker stop ovs-db || true
+docker rm -v ovs-db || true
+docker run -d \
+--net=host \
+--name ovs-db \
+--restart=always \
+-v /var/run/openvswitch:/var/run/openvswitch:rw \
+-v /var/lib/ovn:/var/lib/ovn:rw \
+port/ovsdb-server-node:latest
+
+docker stop ovs-vswitchd || true
+docker rm -v ovs-vswitchd || true
+docker run -d \
+--net=host \
+--pid=host \
+--ipc=host \
+--name ovs-vswitchd \
+--privileged \
+--cap-add NET_ADMIN \
+--restart=always \
+-v /dev/net:/dev/net:rw \
+-v /var/run/netns:/var/run/netns:rw \
+-v /var/run/openvswitch:/var/run/openvswitch:rw \
+-v /var/lib/ovn:/var/lib/ovn:rw \
+port/ovs-vswitchd:latest
+
+sleep 2s
+ovs-vsctl --no-wait init
+ovs-vsctl --no-wait set open_vswitch . system-type="HarborOS"
+ovs-vsctl --no-wait set open_vswitch . external-ids:system-id="\$(hostname)"
+
+ovs-vsctl --no-wait -- --may-exist add-br br-ex
+EOF
+chmod +x /usr/local/bin/openvswitch-start
+
+
+cat > /usr/local/bin/openvswitch-stop << EOF
+#!/bin/bash
+docker stop ovs-db || true
+docker rm -v ovs-db || true
+
+docker stop ovs-vswitchd || true
+docker rm -v ovs-vswitchd || true
+EOF
+chmod +x /usr/local/bin/openvswitch-stop
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+yum install -y etcd kubernetes-master kubernetes-node kubernetes-client
+
+cat > /etc/kubernetes/apiserver <<EOF
+###
+# kubernetes system config
+#
+# The following values are used to configure the kube-apiserver
+#
+
+# The address on the local server to listen to.
+KUBE_API_ADDRESS="--insecure-bind-address=127.0.0.1"
+
+# The port on the local server to listen on.
+# KUBE_API_PORT="--port=8080"
+
+# Port minions listen on
+# KUBELET_PORT="--kubelet-port=10250"
+
+# Comma separated list of nodes in the etcd cluster
+KUBE_ETCD_SERVERS="--etcd-servers=http://127.0.0.1:2379"
+
+# Address range to use for services
+KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.10.10.0/24"
+
+# default admission control policies
+KUBE_ADMISSION_CONTROL=""
+# Add your own!
+KUBE_API_ARGS=""
+EOF
+
+systemctl restart etcd kube-apiserver kube-scheduler kube-controller-manager
+systemctl enable etcd kube-apiserver kube-scheduler kube-controller-manager
+
+
+
+
+
+docker run -d \
+--name="kubelet" \
+--privileged="true" \
+--net="host" \
+--pid="host" \
+-v /sys:/sys:ro \
+-v /var/run:/var/run:rw \
+-v /:/rootfs:ro \
+-v /dev:/dev:rw \
+-v /var/lib/docker:/var/lib/docker:rw \
+-v /var/lib/kubelet:/var/lib/kubelet:rw \
+-v /etc/os-release:/etc/os-release:ro \
+docker.io/port/system-kube:latest \
+/hyperkube \
+kubelet \
+--v=2 \
+--address=0.0.0.0 \
+--allow-privileged=true \
+--api-servers="http://127.0.0.1:8080" \
+--logtostderr=true \
+--docker="unix:///var/run/docker.sock" \
+--network-plugin=cni \
+--containerized
+
+
+
+#yum install gcc python-devel openssl-devel python-pip
+# yum install centos-release-scl
+# yum install rh-python34
+# scl enable rh-python34 bash
+# pip install --upgrade pip
+# pip install --upgrade setuptools
+# pip install --upgrade tox
+# git clone https://github.com/portdirect/kuryr /opt/kuryr
+#
+# cd /opt/kuryr/ && \
+#     git checkout k8s && \
+#     echo "ipaddress" >> requirements.txt && \
+#     tox -egenconfig
+#
+# pip install --upgrade /opt/kuryr
+#
+# mkdir -p /etc/kuryr
+# cp /opt/kuryr/etc/kuryr.conf.sample /etc/kuryr/kuryr.conf
+#
+# mkdir -p /usr/lib/docker/plugins/kuryr
+# cp /opt/kuryr/etc/kuryr.json /usr/lib/docker/plugins/kuryr/kuryr.json
+
+
+
+
+
+
+/usr/bin/docker run -d --net=host --name kuryr-aven \
+          -e SERVICE_CLUSTER_IP_RANGE="10.10.10.0/24" \
+          -e SERVICE_USER="admin" \
+          -e SERVICE_TENANT_NAME="admin" \
+          -e SERVICE_PASSWORD="password" \
+          -e IDENTITY_URL="http://127.0.0.1:35357/v2.0" \
+          -e OS_URL="http://127.0.0.1:9696" \
+          -e K8S_API="http://127.0.0.1:8080" \
+          -v /var/log/kuryr:/var/log/kuryr \
+          docker.io/port/system-raven:latest /usr/bin/raven --debug
+
+
+mkdir -p /usr/libexec/kubernetes/kubelet-plugins/net/exec
+cat > /usr/libexec/kubernetes/kubelet-plugins/net/exec/kuryr.conf <<EOF
+{
+  "name": "kuryr",
+  "type": "kuryr"
+}
+EOF
+
+mv /opt/cni/bin/kuryr-py /opt/cni/bin/kuryr
+cat > /opt/cni/bin/kuryr <<EOF
+#!/bin/bash
+exec scl enable rh-python34 /opt/cni/bin/kuryr-py
+EOF
+chmod +x /opt/cni/bin/kuryr
+
+mv /opt/kuryr/usr/libexec/kuryr/ovs /opt/kuryr/usr/libexec/kuryr/unbound
+
+mkdir -p /etc/kuryr/
+cat << EOF > /etc/kuryr/kuryr.conf
+[DEFAULT]
+bindir = /opt/kuryr/usr/libexec/kuryr
+
+[k8s]
+api_root = http://127.0.0.1:8080
+EOF
+
+
+
+
+
+
+
+kubelet \
+  --allow-privileged=true \
+  --api-servers="http://127.0.0.1:8080" \
+  --v=2 \
+  --address='0.0.0.0' \
+  --enable-server \
+  --network-plugin=cni
+
+
+
+
+source /root/keystonerc_admin
+EXTERNAL_NET_NAME=ext-net
+EXTERNAL_SUBNET_NAME=ext-subnet
+EXTERNAL_ROUTER_NAME=ext-router
+neutron net-create \
+    --router:external \
+    ${EXTERNAL_NET_NAME}
+
+
+
+
+neutron subnet-create \
+--name ${EXTERNAL_SUBNET_NAME} \
+--enable_dhcp=False \
+--allocation-pool=start=100.64.1.0,end=100.64.0.255 \
+--gateway=100.64.0.1 ${EXTERNAL_NET_NAME} 100.64.0.0/10
+
+ip addr add 100.64.0.1/10 dev br-ex
+ip link set br-ex up
+
+
+
+neutron router-create ${EXTERNAL_ROUTER_NAME}
+neutron router-gateway-set ${EXTERNAL_ROUTER_NAME} ${EXTERNAL_NET_NAME}
+
+
+
+ADMIN_NET_NAME=admin-net
+ADMIN_SUBNET_NAME=admin-subnet
+neutron net-create \
+    ${ADMIN_NET_NAME}
+
+
+neutron subnet-create \
+--name ${ADMIN_SUBNET_NAME} \
+--allocation-pool=start=10.64.0.10,end=10.64.0.20 \
+${ADMIN_NET_NAME} 10.64.0.0/24
+neutron router-interface-add ${EXTERNAL_ROUTER_NAME} subnet=${ADMIN_SUBNET_NAME}
+
+
+
+
+
+
+cfg=/etc/kuryr/kuryr.conf
+
+
+crudini --set $cfg keystone_client auth_uri "http://127.0.0.1:35357/v2.0"
+crudini --set $cfg keystone_client admin_user "neutron"
+crudini --set $cfg keystone_client admin_tenant_name "services"
+crudini --set $cfg keystone_client admin_password "password"
+
+crudini --set $cfg neutron_client neutron_uri "http://127.0.0.1:9696"
+
+source /root/keystonerc_admin
+
+
+KURYR_POOL_PREFIX=${KURYR_POOL_PREFIX:-10.10.0.0/16}
+KURYR_POOL_PREFIX_LEN=${KURYR_POOL_PREFIX_LEN:-24}
+
+neutron subnetpool-create --default-prefixlen $KURYR_POOL_PREFIX_LEN --pool-prefix $KURYR_POOL_PREFIX kuryr
+
+
+
+curl -L http://storage.googleapis.com/kubernetes-release/release/v1.3.0/bin/linux/amd64/kubectl > /usr/bin/kubectl
+chmod +x /usr/bin/kubectl
+
+
+HOST_IP="$(ip -f inet -o addr show eth0|cut -d\  -f 7 | cut -d/ -f 1)"
+
+/usr/bin/docker run --name kubernetes-setup-files --net=host \
+          --volume=/data:/data \
+          -d \
+          gcr.io/google_containers/hyperkube-amd64:v1.3.0 \
+            /setup-files.sh \
+            IP:$HOST_IP,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local
+
+
+
+/usr/bin/docker run --name kube-apiserver -d --net=host \
+          --volume=/data:/srv/kubernetes \
+          gcr.io/google_containers/hyperkube-amd64:v1.3.0 \
+          /hyperkube apiserver \
+            --service-cluster-ip-range=10.1.0.1/24 \
+            --insecure-bind-address=0.0.0.0 \
+            --insecure-port=8080 \
+            --etcd-servers=http://127.0.0.1:4001 \
+            --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota \
+            --client-ca-file=/srv/kubernetes/ca.crt \
+            --basic-auth-file=/srv/kubernetes/basic_auth.csv \
+            --min-request-timeout=300 \
+            --tls-cert-file=/srv/kubernetes/server.cert \
+            --tls-private-key-file=/srv/kubernetes/server.key \
+            --token-auth-file=/srv/kubernetes/known_tokens.csv \
+            --allow-privileged=true \
+            --v=2 \
+            --logtostderr=true
+
+
+docker run --name kube-controller-manager --net=host -d \
+--volume=/data:/srv/kubernetes \
+gcr.io/google_containers/hyperkube-amd64:v1.3.0 \
+/hyperkube controller-manager \
+--master=127.0.0.1:8080 \
+--service-account-private-key-file=/srv/kubernetes/server.key \
+--root-ca-file=/srv/kubernetes/ca.crt \
+--min-resync-period=3m \
+--v=2 \
+--logtostderr=true
+
+
+
+/usr/bin/docker run --name kube-scheduler --net=host -d \
+gcr.io/google_containers/hyperkube-amd64:v1.3.0 \
+/hyperkube scheduler \
+--master=127.0.0.1:8080 \
+--v=2 \
+--logtostderr=true
+
+
+docker run --name kuryr-watcher --net=host -d \
+          -e SERVICE_CLUSTER_IP_RANGE=10.1.0.0/24 \
+          -e SERVICE_USER=admin \
+          -e SERVICE_TENANT_NAME=admin \
+          -e SERVICE_PASSWORD=password \
+          -e IDENTITY_URL=http://127.0.0.1:35357/v2.0 \
+          -e OS_URL=http://127.0.0.1:9696 \
+          -e K8S_API=http://127.0.0.1:8080 \
+          -v /var/log/kuryr:/var/log/kuryr \
+          midonet/raven
+
+
+
+          -e ZK_ENDPOINTS=${OST_CONTROLLER_IP}:2181 \
+          -e UUID="${UUID}" \
+
+
+/usr/bin/docker run --name kubelet -d \
+          -e MASTER_IP=127.0.0.1 \
+          --volume=/:/rootfs:ro \
+          --volume=/sys:/sys:ro \
+          --volume=/var/lib/docker/:/var/lib/docker:rw \
+          --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
+          --volume=/var/run:/var/run:rw \
+          --volume=/var/log/kuryr:/var/log/kuryr \
+          --net=host \
+          --privileged=true \
+          --pid=host \
+          midonet/kubelet

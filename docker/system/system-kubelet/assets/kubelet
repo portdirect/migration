@@ -1,0 +1,81 @@
+#!/bin/sh
+. /etc/harbor/kube.env
+export KUBELET_CMD='exec kubelet'
+KUBE_STATUS="$(cat /etc/harbor/kube-status)"
+if [ -z "$KUBE_STATUS" ]; then
+    echo "No status found, launching as bootrapper"
+    export KUBE_STATUS="BOOTSTRAPPING"
+    echo "$KUBE_STATUS" > /etc/harbor/kube-status
+elif [ "$KUBE_STATUS" = "BOOTSTRAPPING" ]; then
+    echo "This node is bootstrapping"
+    export KUBE_STATUS="BOOTSTRAPPING"
+elif [ "$KUBE_STATUS" = "BOOTSTRAPPED" ]; then
+    echo "This node has been boostrapped, just prepping manifests"
+    export KUBE_STATUS="BOOTSTRAPPED"
+fi;
+
+
+if [ "$ROLE" = "master" ]; then
+    echo "This is a master node."
+    /opt/harbor/roles/master &>/var/log/harbor-boostrap &
+else
+    echo "Launching node boostrap script."
+    /opt/harbor/roles/node &>/var/log/harbor-boostrap &
+fi;
+
+
+echo "Configuring Kuryr"
+/opt/harbor/scripts/config-kuryr
+
+
+echo "Ensuring Required Host Assets Exist"
+mkdir -p /var/run/swarm
+touch /var/run/swarm/docker.sock
+
+
+export NODE_HOSTNAME="$(hostname -s).$(hostname -d)"
+echo "Running Kubelet in background untill br-int appears"
+kubelet       --hostname-override=${NODE_HOSTNAME} \
+              --allow-privileged=true \
+              --api-servers="http://${MASTER_IP}:8080" \
+              --v=2 \
+              --address='0.0.0.0' \
+              --enable-server \
+              --containerized \
+              --network-plugin=cni \
+              --config=/etc/kubernetes/manifests \
+              --pod-infra-container-image="port/system-pause:latest" &
+KUBELET_PID=$!
+
+
+echo "Waiting for br-int to exist"
+until ovs-vsctl br-exists br-int; do
+  sleep 30; echo "Waiting for br-int...";
+done;
+
+
+echo "Waiting for Node Bootstrap to complete"
+export KUBE_STATUS="$(cat /etc/harbor/kube-status)"
+until [ "$KUBE_STATUS" = "BOOTSTRAPPED" ]; do
+  echo "Waiting for Node Bootstrap to complete";
+  sleep 30;
+  export KUBE_STATUS="$(cat /etc/harbor/kube-status)"
+done;
+
+
+echo "Stopping Kubelet"
+kill ${KUBELET_PID}
+wait ${KUBELET_PID}
+
+
+echo "Dropping shell and launching Kubelet"
+exec kubelet  --hostname-override=${NODE_HOSTNAME} \
+              --allow-privileged=true \
+              --api-servers="http://${MASTER_IP}:8080" \
+              --v=2 \
+              --address='0.0.0.0' \
+              --enable-server \
+              --containerized \
+              --network-plugin=cni \
+              --config=/etc/kubernetes/manifests \
+              --pod-infra-container-image="port/system-pause:latest"

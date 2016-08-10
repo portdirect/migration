@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: trove
+  name: os-trove
+  namespace: os-trove
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    targetPort: 8779
+    protocol: TCP
+    name: https
+  selector:
+    openstack-app: trove
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: trove-conductor
+  name: trove-conductor
+  namespace: os-trove
+spec:
+  clusterIP: 'None'
+  ports:
+  - port: 1
+  selector:
+    openstack-app: trove-conductor
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: trove-taskmanager
+  name: trove-taskmanager
+  namespace: os-trove
+spec:
+  clusterIP: 'None'
+  ports:
+  - port: 1
+  selector:
+    openstack-app: trove-taskmanager
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: trove-messaging
+  name: os-trove-messaging
+  namespace: os-trove
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 5676
+    targetPort: 5676
+    protocol: TCP
+    name: rabbitmq
+  selector:
+    openstack-app: trove-messaging

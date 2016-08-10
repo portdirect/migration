@@ -1,0 +1,62 @@
+#!/bin/bash
+set -e
+PATH=${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+
+
+if [ ! -f /etc/master-node ]
+  then
+    KUBERNETES_IP="$(dig +short kubernetes.skydns.local)"
+    sed -i "/ kubernetes.${OS_DOMAIN} /d" /etc/hosts
+    echo "$KUBERNETES_IP kubernetes.${OS_DOMAIN} kubernetes #Updated by kubelet.service" >> /etc/hosts
+fi
+
+
+
+
+sed -i "s/{{OS_DOMAIN}}/${OS_DOMAIN}/g" /etc/kubernetes/manifests/*
+sed -i "s/{{OS_DOMAIN}}/${OS_DOMAIN}/g" /etc/kubernetes/docker-compose.yml
+sed -i "s/{{HOST_FQDN}}/$(hostname -s).${OS_DOMAIN}/g" /etc/kubernetes/docker-compose.yml
+mkdir -p /etc/cni/net.d
+cat > /etc/cni/net.d/10-calico.conf <<EOF
+{
+    "name": "calico-k8s-network",
+    "type": "calico",
+    "etcd_authority": "etcd-network.${OS_DOMAIN}:4001",
+    "log_level": "info",
+    "ipam": {
+        "type": "calico-ipam"
+    }
+}
+EOF
+
+cd /etc/kubernetes; docker-compose --project-name kubernetes pull || true
+cd /etc/kubernetes; docker-compose --project-name kubernetes down || true
+
+if [ -f /etc/master-node ]
+  then
+    systemctl stop skydns || true
+    docker-bootstrap stop bootstrap-etcd-network || true
+    docker-bootstrap kill bootstrap-etcd-network || true
+    docker-bootstrap rm bootstrap-etcd-network || true
+fi
+
+cd /etc/kubernetes; docker-compose --project-name kubernetes up -d
+
+
+if [ -f /etc/master-node ]
+  then
+    # Update the hosts file to point to docker1 ip addr
+    HOST_DOCKER_IP=$(ip -f inet -o addr show docker1|cut -d\  -f 7 | cut -d/ -f 1)
+    until etcdctl \
+          --no-sync \
+          --ca-file /rootfs/etc/harbor/auth/host/ca.crt \
+          --cert-file /rootfs/etc/harbor/auth/host/host.crt \
+          --key-file /rootfs/etc/harbor/auth/host/host.key \
+          --peers https://etcd-network.${OS_DOMAIN}:401 \
+          set /skydns/local/skydns/kubernetes "{\"host\":\"${HOST_DOCKER_IP}\"}"; do
+       echo "Waiting for Network ETCD"
+       sleep 5
+    done
+    systemctl restart skydns
+fi

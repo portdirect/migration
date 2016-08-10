@@ -1,0 +1,35 @@
+#!/bin/bash
+set -e
+export PATH=$PATH:/usr/local/bin
+OS_HOSTNAME_SHORT=freeipa-master
+IPA_DATA_DIR=/var/lib/harbor/freeipa-master
+OS_DOMAIN=$(hostname -d)
+DNS_FOWARDER=8.8.8.8
+KUBE_DNS_IP=10.112.0.2
+
+#Default settings
+: ${SKYDNS_DEV:="br0"}
+SKYDNS_IP=$(ip -f inet -o addr show ${SKYDNS_DEV}|cut -d\  -f 7 | cut -d/ -f 1)
+#Default settings
+: ${DOCKER_DEV:="docker0"}
+DOCKER_IP=$(ip -f inet -o addr show ${DOCKER_DEV}|cut -d\  -f 7 | cut -d/ -f 1)
+
+
+docker stop ${OS_HOSTNAME_SHORT} || true
+docker rm ${OS_HOSTNAME_SHORT} || true
+docker run -d -t \
+ --restart=always \
+ --hostname=${OS_HOSTNAME_SHORT}.${OS_DOMAIN} \
+ --name=${OS_HOSTNAME_SHORT} \
+ -v ${IPA_DATA_DIR}:/data:rw \
+ -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
+ --dns=${DNS_FOWARDER} \
+ -e OS_DOMAIN=${OS_DOMAIN} \
+ port/docker-freeipa-centos-7-upstream:latest
+
+IPA_CONTAINER_IP="$(docker inspect --format '{{.NetworkSettings.IPAddress}}' ${OS_HOSTNAME_SHORT})"
+#etcdctl set /node-skydns/config "{\"dns_addr\":\"0.0.0.0:53\",\"ttl\":3600,\"domain\":\"node.local.\",\"nameservers\":[\"${IPA_CONTAINER_IP}:53\",\"${KUBE_DNS_IP}:53\"]}"
+etcdctl set /node-skydns/config "{\"dns_addr\":\"0.0.0.0:53\",\"ttl\":3600,\"domain\":\"node.local.\",\"nameservers\":[\"${IPA_CONTAINER_IP}:53\"]}"
+etcdctl set /master-skydns/config "{\"dns_addr\":\"0.0.0.0:53\",\"ttl\":3600,\"domain\":\"node.local.\",\"nameservers\":[\"${IPA_CONTAINER_IP}:53\"]}"
+
+docker logs -f ${OS_HOSTNAME_SHORT}

@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: barbican
+  name: os-barbican
+  namespace: os-barbican
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    targetPort: 9311
+    protocol: TCP
+    name: https
+  selector:
+    openstack-app: barbican
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: barbican-worker
+  name: barbican-worker
+  namespace: os-barbican
+spec:
+  clusterIP: 'None'
+  ports:
+  - port: 1
+  selector:
+    openstack-app: barbican-worker

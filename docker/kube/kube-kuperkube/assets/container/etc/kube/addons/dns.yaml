@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: kube-dns-v8
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+spec:
+  replicas: 1
+  selector:
+    k8s-app: kube-dns
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-dns
+        kubernetes.io/cluster-service: "true"
+    spec:
+      containers:
+      - name: etcd
+        image: docker.io/port/x86-etcd:latest
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
+          requests:
+            cpu: 100m
+            memory: 50Mi
+        command:
+        - etcd
+        - -data-dir
+        - /var/etcd/data
+        - -listen-client-urls
+        - http://127.0.0.1:2379,http://127.0.0.1:4001
+        - -advertise-client-urls
+        - http://127.0.0.1:2379,http://127.0.0.1:4001
+        - -initial-cluster-token
+        - skydns-etcd
+        volumeMounts:
+        - name: etcd-storage
+          mountPath: /var/etcd/data
+      - name: kube2sky
+        image: docker.io/port/x86-kube2sky:latest
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
+        command:
+        - /kube2sky
+        - -domain={{OS_DOMAIN}}
+        - -kube_master_url={{KUBEMASTER_URL}}
+        - -kubecfg_file=/etc/harbor/auth/kubelet/kubeconfig.yaml
+        volumeMounts:
+        - name: kubeconfig
+          mountPath: /etc/harbor/auth/kubelet/kubeconfig.yaml
+          readOnly: true
+      - name: skydns
+        image: docker.io/port/x86-skydns:latest
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
+        command:
+        - /skydns
+        - -machines=http://127.0.0.1:4001
+        - -addr=0.0.0.0:53
+        - -domain={{OS_DOMAIN}}
+        - -nameservers={{KUBE_DNS_IP}}:53
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
+      volumes:
+      - name: etcd-storage
+        emptyDir: {}
+      - name: kubeconfig
+        hostPath:
+          path: /etc/harbor/auth/kubelet/kubeconfig.yaml
+      dnsPolicy: Default  # Don't use cluster DNS.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "KubeDNS"
+spec:
+  selector:
+    k8s-app: kube-dns
+  clusterIP: {{KUBE_SKYDNS_IP}}
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+  - name: dns-tcp
+    port: 53
+    protocol: TCP

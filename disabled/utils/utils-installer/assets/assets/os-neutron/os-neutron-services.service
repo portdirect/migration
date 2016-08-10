@@ -1,0 +1,25 @@
+[Unit]
+Description=HarborOS: OpenStack: Neutron Services Service
+After=docker.service freeipa.service os-neutron-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=/var/usrlocal/bin/os-neutron-services-preflight.sh
+
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-neutron/kube/os-neutron-services_daemonset.yaml --namespace=os-neutron
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-neutron/kube/os-neutron-services_secrets.yaml --namespace=os-neutron
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-neutron/kube/os-neutron-services_secrets.yaml --namespace=os-neutron
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-neutron/kube/os-neutron-services_daemonset.yaml --namespace=os-neutron --validate=false
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-neutron/kube/os-neutron-services_daemonset.yaml --namespace=os-neutron
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-neutron/kube/os-neutron-services_secrets.yaml --namespace=os-neutron
+
+[Install]
+WantedBy=multi-user.target

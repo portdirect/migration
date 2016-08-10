@@ -1,0 +1,4 @@
+FROM %%DOCKER_NAMESPACE%%/%%DOCKER_PREFIX%%heat-base:%%DOCKER_TAG%%
+ENV OPENSTACK_SUBCOMPONENT engine
+
+ADD ./start.sh /start.sh

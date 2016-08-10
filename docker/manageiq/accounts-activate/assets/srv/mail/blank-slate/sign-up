@@ -1,0 +1,17 @@
+Hi {{ USER }}!
+
+Welcome to {{ OS_DOMAIN }} Beta!
+
+Thanks so much for joining us, you’re on your way to super-productivity and beyond!
+
+{{ OS_DOMAIN }} is the most flexible IT management platform, allowing you to manage and deploy virtual machines, docker containers wherever you want; from Public Clouds and Workstations or IoT devices, with a range of management tools including: Kubernetes, Ansible, Puppet, and OpenStack.
+
+During the beta you can explore the services on our development cluster, while we prepare for full production.
+
+Follow the link bellow to log in and discover the {{ OS_DOMAIN }} cloud services, and painless infrastructure management.
+
+Have any questions? Just shoot us an email! We’re always here to help.
+
+Cheers,
+
+Pete Birley

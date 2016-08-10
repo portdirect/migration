@@ -1,0 +1,49 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-rc
+      name: {{OPENSTACK_COMPONENT}}
+    spec:
+      nodeSelector:
+        glusterfs: 'true'
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/glusterfs-base:{{OS_RELEASE}}
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: var-lib-gluster
+              mountPath: /bricks
+              readOnly: false
+            - name: var-lib-glusterd
+              mountPath: /var/lib/glusterd
+              readOnly: false
+            - name: var-log-glusterfs
+              mountPath: /var/log/glusterfs
+              readOnly: false
+          securityContext:
+            privileged: true
+      hostNetwork: true
+      hostIPC: true
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-secret
+        - name: var-lib-gluster
+          hostPath:
+            path: /var/lib/os-gluster
+        - name: var-lib-glusterd
+          hostPath:
+            path: /var/lib/glusterd
+        - name: var-log-glusterfs
+          hostPath:
+            path: /var/log/glusterfs

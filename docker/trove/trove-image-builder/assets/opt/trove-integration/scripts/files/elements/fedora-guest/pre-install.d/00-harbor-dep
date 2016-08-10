@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# CONTEXT: GUEST during CONSTRUCTION as ROOT
+# PURPOSE: Install trove guest python dependencies - see redstack functions_qemu
+
+set -e
+set -o xtrace
+
+curl -L https://trunk.rdoproject.org/f22/consistent/delorean.repo > /etc/yum.repos.d/delorean.repo
+curl -L https://trunk.rdoproject.org/f22/delorean-deps.repo > /etc/yum.repos.d/delorean-deps.repo
+
+dnf install -y python

@@ -1,0 +1,17 @@
+/etc/os-common/common.env
+/etc/freeipa/credentials-client-provisioning.env
+/etc/freeipa/credentials-user-provisioning.env
+/etc/os-database/os-database.env
+/etc/os-database/credentials-os-database.env
+/etc/os-messaging/os-messaging.env
+/etc/os-messaging/credentials-os-messaging.env
+/etc/os-keystone/os-keystone.env
+/etc/os-keystone/credentials-os-keystone.env
+/etc/os-glance/os-glance.env
+/etc/os-glance/credentials-os-glance.env
+/etc/os-neutron/os-neutron.env
+/etc/os-neutron/credentials-os-neutron.env
+/etc/os-nova/os-nova.env
+/etc/os-nova/credentials-os-nova.env
+/etc/os-heat/os-heat.env
+/etc/os-heat/credentials-os-heat.env

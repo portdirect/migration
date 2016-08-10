@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: openvirtualnetwork-node
+    version: v0.1.0
+  name: ovn-node
+  namespace: node-ovn
+spec:
+  hostNetwork: true
+  containers:
+  - name: node-ovsdb-server
+    image: docker.io/port/ovs:latest
+    ports:
+      - containerPort: 6640
+        hostPort: 6640
+        name: ovs-db
+    command:
+      - /start-node-ovsdb.sh
+    volumeMounts:
+      - mountPath: /var/run/openvswitch
+        name: var-run-openvswitch
+      - mountPath: /var/lib/ovn
+        name: var-lib-ovn
+  - name: node-ovs-vswitchd
+    image: docker.io/port/ovs:latest
+    command:
+      - /start-node-vswitchd.sh
+    volumeMounts:
+      - mountPath: /var/run/openvswitch
+        name: var-run-openvswitch
+      - mountPath: /var/lib/ovn
+        name: var-lib-ovn
+      - mountPath: /var/run/netns
+        name: var-run-netns
+      - mountPath: /dev/net
+        name: dev-net
+    securityContext:
+      privileged: true
+  - name: node-ovn-controller
+    image: docker.io/port/ovs:latest
+    env:
+      - name: TUNNEL_DEV
+        value: eth0
+      - name: OVS_SB_DB_IP
+        value: {{OVS_SB_DB_IP}}
+    command:
+      - /start-node-controller.sh
+    volumeMounts:
+      - mountPath: /var/run/openvswitch
+        name: var-run-openvswitch
+  volumes:
+    - name: var-run-openvswitch
+      hostPath:
+        path: /var/run/openvswitch
+    - name: var-lib-ovn
+      hostPath:
+        path: /var/lib/ovn
+    - name: var-run-netns
+      hostPath:
+        path: /var/run/netns
+    - name: dev-net
+      hostPath:
+        path: /dev/net

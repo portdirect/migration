@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-rc
+      name: {{OPENSTACK_COMPONENT}}
+    spec:
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/haproxy-base:{{OS_RELEASE}}
+          ports:
+            - containerPort: 22
+            - containerPort: 80
+            - containerPort: 443
+            - containerPort: 6080
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-sni
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-sni-rc
+      name: {{OPENSTACK_COMPONENT}}-sni
+    spec:
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-sni
+          image: docker.io/port/sniproxy-base:{{OS_RELEASE}}
+          ports:
+            - containerPort: 443
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}-sni.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}

@@ -1,0 +1,4 @@
+/etc/os-common/common.env
+/etc/freeipa/credentials-client-provisioning.env
+/etc/os-messaging/os-messaging.env
+/etc/os-messaging/credentials-os-messaging.env

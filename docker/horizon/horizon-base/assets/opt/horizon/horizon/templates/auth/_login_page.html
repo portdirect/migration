@@ -1,0 +1,42 @@
+{% extends 'auth/_login_page_form.html' %}
+{% load i18n %}
+{% load branding i18n %}
+
+{% block pre_login %}
+    <span id="badge">
+      <i alt="{% site_branding %}" class="fa fa-anchor" style="font-size: 64px; color: #fff;">
+      </i>
+    </span>
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-12">
+            <!-- <div id="brand">{% site_branding %}</div> -->
+            <div id="brand"><strong>PORT.</strong>DIRECT</div>
+          </div><!--/#brand-->
+        </div><!--/.col-*-->
+        <div class="col-sm-7 col-md-6 col-lg-5 login">
+        {{ block.super }}
+{% endblock %}
+
+{% block login_header %}
+  {{ block.super }}
+{% endblock %}
+
+{% block post_login %}
+      {{ block.super }}
+         </div><!--/.col-*-->
+        <div class="col-sm-5 col-md-6 col-lg-7 status">
+          <!-- <dl class="dl-horizontal">
+            <dt>Powered By</dt>
+            <dd>HarborOS</dd>
+            <dt>Upstream Release</dt>
+            <dd>Mitaka</dd>
+            <dt>Release Cycle</dt>
+            <dd>Continuous Delivery</dd>
+            <dt>Status</dt>
+            <dd>Beta</dd>
+          </dl> -->
+        </div><!--/.col-*-->
+      </div><!--/.row-->
+    </div><!--/.container-->
+{% endblock %}

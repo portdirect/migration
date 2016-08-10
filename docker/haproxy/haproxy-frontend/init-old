@@ -1,0 +1,277 @@
+#!/bin/sh
+set -e
+tail -f /dev/null
+################################################################################
+echo "${OS_DISTRO}: Generating local environment file from secrets_dir"
+################################################################################
+SECRETS_DIR=/etc/os-config
+find $SECRETS_DIR -type f -print -exec sh -c "cat {} | sed  's|\\\n$||g'" \; > /etc/os-container.env
+sed -i '/^\// d' /etc/os-container.env
+
+
+################################################################################
+echo "${OS_DISTRO}: Sourcing local environment variables"
+################################################################################
+source /etc/os-container.env
+################################################################################
+echo "${OS_DISTRO}: ${OPENSTACK_COMPONENT}: ${OPENSTACK_SUBCOMPONENT}: Configuring haproxy"
+################################################################################
+cat > /etc/haproxy/haproxy.cfg <<EOF
+global
+    log         127.0.0.1 local2
+
+    chroot      /var/lib/haproxy
+    pidfile     /var/run/haproxy.pid
+    maxconn     4000
+    user        haproxy
+    group       haproxy
+    daemon
+    stats socket /var/lib/haproxy/stats
+
+defaults
+    log                     global
+    option                  dontlognull
+    option http-server-close
+    option                  redispatch
+    retries                 3
+    timeout http-request    10s
+    timeout queue           1m
+    timeout connect         10s
+    timeout client          1m
+    timeout server          1m
+    timeout http-keep-alive 10s
+    timeout check           10s
+    maxconn                 3000
+
+frontend  http_insecure
+    bind :80
+    mode http
+    option                  httplog
+    option forwardfor       except 127.0.0.0/8
+
+    # Define hosts
+    acl host_ipa hdr(host) -i freeipa-master.${OS_DOMAIN}
+    acl host_ipa_ca hdr(host) -i ipa-ca.${OS_DOMAIN}
+    acl host_horizon hdr(host) -i api.${OS_DOMAIN}
+    acl host_keystone hdr(host) -i keystone.${OS_DOMAIN}
+    acl host_glance hdr(host) -i glance.${OS_DOMAIN}
+    acl host_nova_ec2 hdr(host) -i nova-ec2.${OS_DOMAIN}
+    acl host_nova hdr(host) -i nova.${OS_DOMAIN}
+    acl host_nova_vnc hdr(host) -i vnc.${OS_DOMAIN}
+    acl host_nova_spice hdr(host) -i spice.${OS_DOMAIN}
+    acl host_nova_serial hdr(host) -i serial.${OS_DOMAIN}
+    acl host_neutron hdr(host) -i neutron.${OS_DOMAIN}
+    acl host_swift hdr(host) -i swift.${OS_DOMAIN}
+    acl host_cinder hdr(host) -i cinder.${OS_DOMAIN}
+    acl host_heat hdr(host) -i heat.${OS_DOMAIN}
+    acl host_heat_cfn hdr(host) -i heat-cfn.${OS_DOMAIN}
+
+    # Forward to the appropriate backend
+    use_backend http_ipa_cluster if host_ipa
+    use_backend http_ipa_ca_cluster if host_ipa_ca
+    use_backend http_horizon_cluster if host_horizon
+    use_backend http_keystone_cluster if host_keystone
+    use_backend http_glance_cluster if host_glance
+    use_backend http_nova_ec2_cluster if host_nova_ec2
+    use_backend http_nova_cluster if host_nova
+    use_backend http_nova_vnc_cluster if host_nova_vnc
+    use_backend http_nova_spice_cluster if host_nova_spice
+    use_backend http_nova_serial_cluster if host_nova_serial
+    use_backend http_neutron_cluster if host_neutron
+    use_backend http_swift_cluster if host_swift
+    use_backend http_cinder_cluster if host_cinder
+    use_backend http_heat_cluster if host_heat
+    use_backend http_heat_cfn_cluster if host_heat_cfn
+
+    # Define the fallback backend
+    default_backend             http_horizon_cluster
+
+frontend  https_passthough
+    bind :443
+    mode tcp
+    option                  tcplog
+
+    # Define hosts
+    acl host_tcp_ipa  req.ssl_sni -i freeipa-master.${OS_DOMAIN}
+    acl host_tcp_ipa_ca  req.ssl_sni -i ipa-ca.${OS_DOMAIN}
+    acl host_tcp_horizon  req.ssl_sni -i api.${OS_DOMAIN}
+    acl host_tcp_keystone  req.ssl_sni -i keystone.${OS_DOMAIN}
+    acl host_tcp_glance  req.ssl_sni -i glance.${OS_DOMAIN}
+    acl host_tcp_nova_ec2  req.ssl_sni -i nova-ec2.${OS_DOMAIN}
+    acl host_tcp_nova  req.ssl_sni -i nova.${OS_DOMAIN}
+    acl host_tcp_nova_vnc  req.ssl_sni -i vnc.${OS_DOMAIN}
+    acl host_tcp_nova_spice  req.ssl_sni -i spice.${OS_DOMAIN}
+    acl host_tcp_nova_serial  req.ssl_sni -i serial.${OS_DOMAIN}
+    acl host_tcp_neutron req.ssl_sni -i neutron.${OS_DOMAIN}
+    acl host_tcp_swift req.ssl_sni -i swift.${OS_DOMAIN}
+    acl host_tcp_cinder req.ssl_sni -i cinder.${OS_DOMAIN}
+    acl host_tcp_heat req.ssl_sni -i heat.${OS_DOMAIN}
+    acl host_tcp_heat_cfn req.ssl_sni -i heat-cfn.${OS_DOMAIN}
+
+    # Reject connections if not defined
+    tcp-request inspect-delay 2s
+    tcp-request content reject if !host_tcp_ipa \
+                                  !host_tcp_ipa_ca \
+                                  !host_tcp_horizon \
+                                  !host_tcp_keystone \
+                                  !host_tcp_glance \
+                                  !host_tcp_nova_ec2 \
+                                  !host_tcp_nova \
+                                  !host_tcp_nova_vnc \
+                                  !host_tcp_nova_spice \
+                                  !host_tcp_nova_serial \
+                                  !host_tcp_neutron \
+                                  !host_tcp_swift \
+                                  !host_tcp_cinder \
+                                  !host_tcp_heat \
+                                  !host_tcp_heat_cfn
+
+    # Forward to the appropriate backend
+    use_backend https_tcp_ipa_cluster if host_tcp_ipa
+    use_backend https_tcp_ipa_ca_cluster if host_tcp_ipa_ca
+    use_backend https_tcp_horizon_cluster if host_tcp_horizon
+    use_backend https_tcp_keystone_cluster if host_tcp_keystone
+    use_backend https_tcp_glance_cluster if host_tcp_glance
+    use_backend https_tcp_nova_ec2_cluster if host_tcp_nova_ec2
+    use_backend https_tcp_nova_cluster if host_tcp_nova
+    use_backend https_tcp_nova_vnc_cluster if host_tcp_nova_vnc
+    use_backend https_tcp_nova_spice_cluster if host_tcp_nova_spice
+    use_backend https_tcp_nova_serial_cluster if host_tcp_nova_serial
+    use_backend https_tcp_neutron_cluster if host_tcp_neutron
+    use_backend https_tcp_swift_cluster if host_tcp_swift
+    use_backend https_tcp_cinder_cluster if host_tcp_cinder
+    use_backend https_tcp_heat_cluster if host_tcp_heat
+    use_backend https_tcp_heat_cfn_cluster if host_tcp_heat_cfn
+
+    # Define the fallback backend, though clients should not get here as they will have been rejected above
+    default_backend             https_tcp_horizon_cluster
+
+
+
+backend http_ipa_cluster
+    mode http
+    balance     roundrobin
+    server  app1 freeipa-master.${OS_DOMAIN}:80 check
+backend https_tcp_ipa_cluster
+    mode tcp
+    server  app1 freeipa-master.${OS_DOMAIN}:443 check
+
+backend http_ipa_ca_cluster
+    mode http
+    balance     roundrobin
+    server  app1 ipa-ca.${OS_DOMAIN}:80 check
+backend https_tcp_ipa_ca_cluster
+    mode tcp
+    server  app1 ipa-ca.${OS_DOMAIN}:443 check
+
+backend http_horizon_cluster
+    mode http
+    balance     roundrobin
+    server  app1 horizon.os-horizon.svc.${OS_DOMAIN}:80 check
+backend https_tcp_horizon_cluster
+    mode tcp
+    server  app1 horizon.os-horizon.svc.${OS_DOMAIN}:443 check
+
+backend http_keystone_cluster
+    mode http
+    balance     roundrobin
+    server  app1 keystone.os-keystone.svc.${OS_DOMAIN}:80 check
+backend https_tcp_keystone_cluster
+    mode tcp
+    server  app1 keystone.os-keystone.svc.${OS_DOMAIN}:443 check
+
+backend http_glance_cluster
+    mode http
+    balance     roundrobin
+    server  app1 glance.os-glance.svc.${OS_DOMAIN}:80 check
+backend https_tcp_glance_cluster
+    mode tcp
+    server  app1 glance.os-glance.svc.${OS_DOMAIN}:443 check
+
+backend http_nova_ec2_cluster
+    mode http
+    balance     roundrobin
+    server  app1 nova-ec2.os-nova.svc.${OS_DOMAIN}:80 check
+backend https_tcp_nova_ec2_cluster
+    mode tcp
+    server  app1 nova-ec2.os-nova.svc.${OS_DOMAIN}:443 check
+
+backend http_nova_cluster
+    mode http
+    balance     roundrobin
+    server  app1 nova.os-nova.svc.${OS_DOMAIN}:80 check
+backend https_tcp_nova_cluster
+    mode tcp
+    server  app1 nova.os-nova.svc.${OS_DOMAIN}:443 check
+
+backend http_nova_vnc_cluster
+    mode http
+    balance     roundrobin
+    server  app1 novnc.os-nova.svc.${OS_DOMAIN}:80 check
+backend https_tcp_nova_vnc_cluster
+    mode tcp
+    server  app1 novnc.os-nova.svc.${OS_DOMAIN}:443 check
+
+backend http_nova_spice_cluster
+    mode http
+    balance     roundrobin
+    server  app1 spice.os-nova.svc.${OS_DOMAIN}:6082 check
+backend https_tcp_nova_spice_cluster
+    mode tcp
+    server  app1 spice.os-nova.svc.${OS_DOMAIN}:443 check
+
+backend http_nova_serial_cluster
+    mode http
+    balance     roundrobin
+    server  app1 serial.os-nova.svc.${OS_DOMAIN}:80 check
+backend https_tcp_nova_serial_cluster
+    mode tcp
+    server  app1 serial.os-nova.svc.${OS_DOMAIN}:443 check
+
+backend http_neutron_cluster
+    mode http
+    balance     roundrobin
+    server  app1 neutron.os-neutron.svc.${OS_DOMAIN}:80 check
+backend https_tcp_neutron_cluster
+    mode tcp
+    server  app1 neutron.os-neutron.svc.${OS_DOMAIN}:443 check
+
+backend http_swift_cluster
+    mode http
+    balance     roundrobin
+    server  app1 swift.os-swift.svc.${OS_DOMAIN}:80 check
+backend https_tcp_swift_cluster
+    mode tcp
+    server  app1 swift.os-swift.svc.${OS_DOMAIN}:443 check
+
+backend http_cinder_cluster
+    mode http
+    balance     roundrobin
+    server  app1 cinder.os-cinder.svc.${OS_DOMAIN}:80 check
+backend https_tcp_cinder_cluster
+    mode tcp
+    server  app1 cinder.os-cinder.svc.${OS_DOMAIN}:443 check
+
+backend http_heat_cluster
+    mode http
+    balance     roundrobin
+    server  app1 heat.os-heat.svc.${OS_DOMAIN}:80 check
+backend https_tcp_heat_cluster
+    mode tcp
+    server  app1 heat.os-heat.svc.${OS_DOMAIN}:443 check
+
+backend http_heat_cfn_cluster
+    mode http
+    balance     roundrobin
+    server  app1 heat-cfn.os-heat.svc.${OS_DOMAIN}:80 check
+backend https_tcp_heat_cfn_cluster
+    mode tcp
+    server  app1 heat-cfn.os-heat.svc.${OS_DOMAIN}:443 check
+
+EOF
+
+
+################################################################################
+echo "${OS_DISTRO}: ${OPENSTACK_COMPONENT}: ${OPENSTACK_SUBCOMPONENT}: Launching haproxy"
+################################################################################
+exec haproxy -db -V -f /etc/haproxy/haproxy.cfg

@@ -1,0 +1,43 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-rc
+      name: {{OPENSTACK_COMPONENT}}
+    spec:
+      nodeSelector:
+        os-mongodb: 'true'
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/mongodb-app:{{OS_RELEASE}}
+          ports:
+            - containerPort: 27017
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: {{OPENSTACK_COMPONENT}}-storage
+              mountPath: "/data/db"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "0.2"
+            limits:
+              memory: "512Mi"
+              cpu: "1.0"
+          securityContext:
+            privileged: false
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}
+        - name: {{OPENSTACK_COMPONENT}}-storage
+          hostPath:
+            path: {{OS_DATABASE_MONGODB_DIR}}

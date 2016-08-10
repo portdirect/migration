@@ -1,0 +1,167 @@
+
+IP=50
+INITIAL_DEV=$(ip addr | grep "^2:" | awk -F ':' '{print $2}' | sed '/^$/d;s/[[:blank:]]//g')
+FIXED_IP_START=10.120.100.${IP}
+FIXED_IP_CIDR=$(ip -f inet -o addr show $INITIAL_DEV|cut -d\  -f 7 | cut -d/ -f 2)
+FIXED_IP_GATEWAY=$(ip route | grep "default" | grep "eth0" | awk '{ print $3}')
+echo $FIXED_IP_START
+
+
+cat > /etc/sysconfig/network-scripts/ifcfg-${INITIAL_DEV} << EOF
+DEVICE="${INITIAL_DEV}"
+NM_CONTROLLED="no"
+ONBOOT="yes"
+BOOTPROTO=static
+# BOOTPROTO=dhcp
+IPADDR=${FIXED_IP_START}
+NETMASK=255.255.255.0
+GATEWAY=${FIXED_IP_GATEWAY}
+EOF
+
+
+INITIAL_DEV=eth1
+FIXED_IP_START=10.130.100.${IP}
+FIXED_IP_CIDR=$(ip -f inet -o addr show $INITIAL_DEV|cut -d\  -f 7 | cut -d/ -f 2)
+echo $FIXED_IP_START
+
+
+cat > /etc/sysconfig/network-scripts/ifcfg-${INITIAL_DEV} << EOF
+DEVICE="${INITIAL_DEV}"
+NM_CONTROLLED="no"
+ONBOOT="yes"
+BOOTPROTO=static
+# BOOTPROTO=dhcp
+IPADDR=${FIXED_IP_START}
+NETMASK=255.255.255.0
+EOF
+
+
+systemctl stop NetworkManager.service
+systemctl disable NetworkManager.service
+systemctl enable network
+
+
+
+
+
+
+
+
+for node in onos packstack compute1 compute2 router gateway; do
+  ssh $node yum install -y cockpit docker
+  ssh $node systemctl enable cockpit.socket
+  ssh $node reboot
+  sed -i '/s/DOCKER_NETWORK_OPTIONS=/DOCKER_NETWORK_OPTIONS=--bridge=none/' /etc/sysconfig/docker-network
+done
+
+
+
+
+for node in onos packstack compute1 compute2 router gateway; do
+  ssh-copy-id $node
+done
+
+
+for node in onos packstack compute1 compute2 router gateway; do
+  sed -i 's/DOCKER_NETWORK_OPTIONS=/DOCKER_NETWORK_OPTIONS=--bridge=none/' /etc/sysconfig/docker-network
+  systemctl enable docker
+  systemctl start docker
+  docker info
+done
+
+for node in onos packstack compute1 compute2 router gateway; do
+  ssh $node -p 222 yum install -y openvswitch
+  ssh $node -p 222 systemctl enable openvswitch
+  ssh $node -p 222 systemctl restart openvswitch
+done
+
+
+
+for node in packstack compute1 compute2; do
+  ssh $node -p 222 yum install -y git python-pip
+  ssh $node -p 222 pip install --upgrade pip
+  ssh $node -p 222 git clone https://github.com/openstack/networking-onos.git /opt/networking-onos
+  ssh $node -p 222 pip install /opt/networking-onos
+done
+
+
+for node in compute1 compute2; do
+  ssh $node -p 222 systemctl enable neutron-openvswitch-agent
+  ssh $node -p 222 systemctl restart neutron-openvswitch-agent
+done
+
+for node in packstack compute1 compute2; do
+  ssh $node -p 222 shutdown
+done
+
+for node in packstack compute1 compute2; do
+  ssh $node -p 222 yum install -y openvswitch git
+  ssh $node -p 222 systemctl enable openvswitch
+  ssh $node -p 222 systemctl restart openvswitch
+done
+git clone https://github.com/openstack/networking-onos.git ~/networking-onos
+cd ~/networking-onos
+python setup.py install
+
+
+
+for node in onos packstack compute1 compute2 router gateway; do
+  ssh $node -p 222 shutdown -h now
+done
+
+for node in packstack compute1 compute2 router gateway; do
+  ssh $node
+done
+
+
+
+for node in onos packstack compute1 compute2 router gateway; do
+  ssh $node yum install -y bridge-utils bind-utils
+    ssh $node yum -y update
+      ssh $node yum -y upgrade
+done
+systemctl restart network
+
+
+
+cat > /etc/systemd/system/harbor-onos.service << EOF
+[Unit]
+Description=ONOS
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+
+ExecStartPre=-/usr/bin/docker pull port/onos-api:latest
+ExecStartPre=-/usr/bin/docker stop onos
+ExecStartPre=-/usr/bin/docker kill onos
+ExecStartPre=-/usr/bin/docker rm -v onos
+ExecStartPre=/usr/bin/docker run --name onos -td --net=host -v /sys/fs/cgroup:/sys/fs/cgroup:ro --privileged --net=host port/onos-api:latest /usr/sbin/init
+ExecStart=/usr/bin/docker logs -f onos
+ExecStop=-/usr/bin/docker stop onos
+StandardOutput=tty
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+
+
+ssh packstack
+
+
+packstack --allinone
+
+
+
+
+
+
+
+
+
+ovs-appctl -t ovsdb-server ovsdb-server/add-remote ptcp:6640:$(ip -f inet -o addr show eth0|cut -d\  -f 7 | cut -d/ -f 1)

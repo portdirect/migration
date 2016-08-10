@@ -1,0 +1,58 @@
+#!/bin/bash
+source /etc/etcd/etcd.env
+
+
+: ${ETCD_DISCOVERY_TOKEN:={{MASTER_ETCD_DISCOVERY_TOKEN}}}
+: ${ETCD_INITIAL_NODES:=1}
+
+: ${INITIAL_CLUSTER:="master=http://master.$(hostname -d):7001"}
+
+
+ETCD_NAME=$(hostname --fqdn)
+
+
+
+
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: ETCD: Launching"
+echo "-------------------------------------------------------------------------"
+source /etc/etcd/etcd.env
+# exec /usr/local/bin/harbor-docker run \
+#       --name etcd \
+#       --net=host \
+#       --restart=always \
+#       -d \
+#       -v /etc/ssl/certs/ca-bundle.crt:/etc/ssl/certs/ca-certificates.crt:ro \
+#       -v /data \
+#        ${HARBOR_ETCD_IMAGE_NAME} etcd \
+#           --name "${ETCD_NAME}" \
+#           --proxy=on \
+#           --initial-cluster ${INITIAL_CLUSTER} \
+#           --data-dir "/data/${ETCD_NAME}.etcd" \
+#           --listen-peer-urls "http://127.0.0.1:2380,http://0.0.0.0:7001" \
+#           --listen-client-urls "http://127.0.0.1:2379,http://0.0.0.0:4001" \
+#           --initial-advertise-peer-urls "http://$(hostname -f):7001" \
+#           --advertise-client-urls "http://$(hostname -f):4001"
+exec /usr/local/bin/harbor-docker run \
+      --name etcd \
+      --net=host \
+      --restart=always \
+      -d \
+      -v /etc/harbor/auth/host:/etc/harbor/auth/host:ro \
+      -v /etc/ssl/certs/ca-bundle.crt:/etc/ssl/certs/ca-certificates.crt:ro \
+      -v /data \
+       ${HARBOR_ETCD_IMAGE_NAME} etcd \
+          --name "${ETCD_NAME}" \
+          --proxy=on \
+          --initial-cluster ${INITIAL_CLUSTER} \
+          --data-dir "/data/${ETCD_NAME}.etcd" \
+          --listen-peer-urls "https://127.0.0.1:2380,https://0.0.0.0:7001" \
+          --listen-client-urls "https://127.0.0.1:2379,https://0.0.0.0:4001" \
+          --initial-advertise-peer-urls "https://$(hostname -f):7001" \
+          --advertise-client-urls "https://$(hostname -f):4001" \
+          --ca-file '/etc/harbor/auth/host/ca.crt' \
+          --cert-file '/etc/harbor/auth/host/host.crt' \
+          --key-file '/etc/harbor/auth/host/host.key' \
+          --peer-ca-file '/etc/harbor/auth/host/ca.crt' \
+          --peer-cert-file '/etc/harbor/auth/host/host.crt' \
+          --peer-key-file '/etc/harbor/auth/host/host.key'

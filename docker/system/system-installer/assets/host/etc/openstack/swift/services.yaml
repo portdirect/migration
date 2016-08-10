@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: swift
+  name: os-swift
+  namespace: os-swift
+spec:
+  sessionAffinity: 'ClientIP'
+  clusterIP: "None"
+  ports:
+  - port: 443
+    targetPort: 8088
+    protocol: TCP
+    name: https
+  selector:
+    openstack-app: swift
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: swift-storage-rsync
+  name: swift-rsync
+  namespace: os-swift
+spec:
+  clusterIP: "None"
+  ports:
+  - port: 873
+    targetPort: 873
+    protocol: TCP
+    name: rsync
+  selector:
+    openstack-app: swift-storage-rsync
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: swift-storage-account
+  name: swift-account
+  namespace: os-swift
+spec:
+  clusterIP: "None"
+  ports:
+  - port: 6002
+    targetPort: 6002
+    protocol: TCP
+    name: swift-acc
+  selector:
+    openstack-app: swift-storage-account
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: swift-storage-container
+  name: swift-container
+  namespace: os-swift
+spec:
+  clusterIP: "None"
+  ports:
+  - port: 6001
+    targetPort: 6001
+    protocol: TCP
+    name: swift-cont
+  selector:
+    openstack-app: swift-storage-container
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: swift-storage-object
+  name: swift-object
+  namespace: os-swift
+spec:
+  clusterIP: "None"
+  ports:
+  - port: 6000
+    targetPort: 6000
+    protocol: TCP
+    name: swift-object
+  selector:
+    openstack-app: swift-storage-object
+---
+kind: Service
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: swift-storage
+  name: gluster-fs
+  namespace: os-swift
+spec:
+  clusterIP: "None"
+  ports:
+  - port: 1
+---
+kind: Endpoints
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: swift-storage
+  name: gluster-fs
+  namespace: os-swift
+subsets:
+- addresses:
+  - ip: 10.140.0.1
+  ports:
+  - port: 1

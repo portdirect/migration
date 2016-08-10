@@ -1,0 +1,474 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: neutron-manager
+  namespace: os-neutron
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  neutron-keystone-user: {{NEUTRON_KEYSTONE_USER}}
+  neutron-keystone-password: {{NEUTRON_KEYSTONE_PASSWORD}}
+  neutron-db-name: {{NEUTRON_DB_NAME}}
+  neutron-db-user: {{NEUTRON_DB_USER}}
+  neutron-db-password: {{NEUTRON_DB_PASSWORD}}
+  neutron-shared-secret: {{NEUTRON_SHARED_SECRET}}
+  nova-keystone-user: {{NOVA_KEYSTONE_USER}}
+  nova-keystone-password: {{NOVA_KEYSTONE_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: neutron-manager
+    version: v0.1.0
+  name: neutron-manager
+  namespace: os-neutron
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: neutron-manager
+        version: v0.1.0
+      name: neutron-manager
+      namespace: os-neutron
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: neutron-manager
+          image:  docker.io/port/neutron-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: neutron-manager
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: neutron
+  namespace: os-neutron
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  neutron-keystone-user: {{NEUTRON_KEYSTONE_USER}}
+  neutron-keystone-password: {{NEUTRON_KEYSTONE_PASSWORD}}
+  neutron-db-name: {{NEUTRON_DB_NAME}}
+  neutron-db-user: {{NEUTRON_DB_USER}}
+  neutron-db-password: {{NEUTRON_DB_PASSWORD}}
+  neutron-shared-secret: {{NEUTRON_SHARED_SECRET}}
+  nova-keystone-user: {{NOVA_KEYSTONE_USER}}
+  nova-keystone-password: {{NOVA_KEYSTONE_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: neutron
+    version: v0.1.0
+  name: neutron
+  namespace: os-neutron
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: neutron
+        version: v0.1.0
+      name: neutron
+      namespace: os-neutron
+    spec:
+      nodeSelector:
+        openstack-neutron: 'true'
+        arch: 'x86'
+      containers:
+        - name: neutron-api
+          image: docker.io/port/neutron-api:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+          - containerPort: 9696
+            name: http
+            protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: neutron
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: os-ssl
+          secret:
+            secretName: neutron-ssl-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: neutron-agent
+  namespace: os-neutron
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  neutron-keystone-user: {{NEUTRON_KEYSTONE_USER}}
+  neutron-keystone-password: {{NEUTRON_KEYSTONE_PASSWORD}}
+  neutron-db-name: {{NEUTRON_DB_NAME}}
+  neutron-db-user: {{NEUTRON_DB_USER}}
+  neutron-db-password: {{NEUTRON_DB_PASSWORD}}
+  neutron-shared-secret: {{NEUTRON_SHARED_SECRET}}
+  nova-keystone-user: {{NOVA_KEYSTONE_USER}}
+  nova-keystone-password: {{NOVA_KEYSTONE_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: neutron-agent
+    version: v0.1.0
+  name: neutron-agent
+  namespace: os-neutron
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: neutron-agent
+        version: v0.1.0
+      name: neutron-agent
+      namespace: os-neutron
+    spec:
+      nodeSelector:
+        neutron-agent: 'true'
+        arch: 'x86'
+      containers:
+        - name: neutron-agent
+          image: docker.io/port/neutron-agent:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: var-run-netns
+              mountPath: /var/run/netns
+              readOnly: false
+            - name: var-run-openvswitch
+              mountPath: /var/run/openvswitch
+              readOnly: false
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: var-lock-neutron
+              mountPath: /var/lock/neutron
+              readOnly: false
+          securityContext:
+            privileged: true
+      restartPolicy: Always
+      hostNetwork: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: neutron-agent
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: var-run-netns
+          hostPath:
+            path: /var/run/netns
+        - name: var-run-openvswitch
+          hostPath:
+            path: /var/run/openvswitch
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: var-lock-neutron
+          hostPath:
+            path: /var/lock/neutron
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: neutron-services
+  namespace: os-neutron
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  neutron-keystone-user: {{NEUTRON_KEYSTONE_USER}}
+  neutron-keystone-password: {{NEUTRON_KEYSTONE_PASSWORD}}
+  neutron-db-name: {{NEUTRON_DB_NAME}}
+  neutron-db-user: {{NEUTRON_DB_USER}}
+  neutron-db-password: {{NEUTRON_DB_PASSWORD}}
+  neutron-shared-secret: {{NEUTRON_SHARED_SECRET}}
+  nova-keystone-user: {{NOVA_KEYSTONE_USER}}
+  nova-keystone-password: {{NOVA_KEYSTONE_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: neutron-services
+    version: v0.1.0
+  name: neutron-services
+  namespace: os-neutron
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: neutron-services
+        version: v0.1.0
+      name: neutron-services
+      namespace: os-neutron
+    spec:
+      nodeSelector:
+        neutron-services: 'true'
+        arch: 'x86'
+      containers:
+        - name: neutron-services
+          image: docker.io/port/neutron-services:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: var-run-netns
+              mountPath: /var/run/netns
+              readOnly: false
+            - name: var-run-openvswitch
+              mountPath: /var/run/openvswitch
+              readOnly: false
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: var-lock-neutron
+              mountPath: /var/lock/neutron
+              readOnly: false
+          securityContext:
+            privileged: true
+      restartPolicy: Always
+      hostNetwork: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: neutron-services
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: var-run-netns
+          hostPath:
+            path: /var/run/netns
+        - name: var-run-openvswitch
+          hostPath:
+            path: /var/run/openvswitch
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: var-lock-neutron
+          hostPath:
+            path: /var/lock/neutron
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: neutron-router
+    version: v0.1.0
+  name: neutron-router
+  namespace: os-neutron
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: neutron-router
+        version: v0.1.0
+      name: neutron-router
+      namespace: os-neutron
+    spec:
+      nodeSelector:
+        neutron-router: 'true'
+        arch: 'x86'
+      containers:
+        - name: neutron-router
+          image: docker.io/port/neutron-router:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: var-run-netns
+              mountPath: /var/run/netns
+              readOnly: false
+            - name: var-run-openvswitch
+              mountPath: /var/run/openvswitch
+              readOnly: false
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: true
+      restartPolicy: Always
+      hostNetwork: true
+      hostPID: true
+      volumes:
+        - name: var-run-netns
+          hostPath:
+            path: /var/run/netns
+        - name: var-run-openvswitch
+          hostPath:
+            path: /var/run/openvswitch
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock

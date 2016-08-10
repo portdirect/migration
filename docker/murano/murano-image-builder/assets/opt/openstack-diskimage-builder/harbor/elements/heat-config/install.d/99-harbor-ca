@@ -1,0 +1,11 @@
+#!/bin/bash
+set -eux
+IPA_CRT='{{IPA_CA_CRT}}'
+
+mkdir -p /etc/pki/ca-trust/source/anchors
+echo "${IPA_CRT}" | base64 --decode > /etc/pki/ca-trust/source/anchors/ipa.crt
+update-ca-trust
+
+# Update requests to use the CA cert from freeipa, this will cause issues untill we update requests to use the systems CA certs
+mkdir -p /usr/lib/python2.7/site-packages/requests/
+cat /etc/pki/ca-trust/source/anchors/ipa.crt >> /usr/lib/python2.7/site-packages/requests/cacert.pem

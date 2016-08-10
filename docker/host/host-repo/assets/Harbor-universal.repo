@@ -1,0 +1,4 @@
+[Harbor-universal]
+name=Harbor Universal Repo
+baseurl=http://rpmostree.harboros.net:8015/repo/atomic-host/7/noarch/
+gpgcheck=0

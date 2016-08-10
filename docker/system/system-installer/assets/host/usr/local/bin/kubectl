@@ -1,0 +1,10 @@
+#!/bin/bash
+set -e
+PATH=${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+
+exec docker exec -it kubelet \
+    /opt/harbor/assets/host/bin/kubectl \
+    --kubeconfig=/etc/harbor/auth/kubelet/kubeconfig.yaml \
+    --server=https://kubernetes.${OS_DOMAIN}:6443 \
+    "$@"

@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+: ${BIN_DIR:="/usr/local/bin"}
+: ${ETC_DIR:="/etc"}
+/bin/cp -rf /opt/harbor/assets/host/bin/* /host${BIN_DIR}/
+mkdir -p /host${ETC_DIR}/${MODULE}/
+/bin/cp -r /opt/harbor/assets/host/etc/${MODULE}/* /host${ETC_DIR}/${MODULE}/
+echo "Installed"

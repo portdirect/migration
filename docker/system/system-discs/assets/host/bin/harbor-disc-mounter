@@ -1,0 +1,26 @@
+#!/bin/bash
+
+PATH=/usr/local/bin:${PATH}
+HARBOROS_ETCD_ROOT=/harboros
+
+# etcdctl ls ${HARBOROS_ETCD_ROOT}/gluster-volumes/ | awk -F '/' '{ print $NF }' | \
+#         while read VOLUME; do
+#         echo $VOLUME
+#         mkdir -p /mnt/$VOLUME
+#         mount -t nfs glusterfs.$(hostname -d):/$VOLUME /mnt/$VOLUME || true
+#         done
+#
+# etcdctl ls ${HARBOROS_ETCD_ROOT}/gluster-volumes/ | awk -F '/' '{ print $NF }' | \
+#         while read VOLUME; do
+#         echo $VOLUME
+#         mkdir -p /mnt/$VOLUME
+#         mount -t glusterfs glusterfs.$(hostname -d):/$VOLUME /mnt/$VOLUME || true
+#         done
+#
+#
+# etcdctl ls ${HARBOROS_ETCD_ROOT}/gluster-volumes/ | awk -F '/' '{ print $NF }' | \
+#         while read VOLUME; do
+#         echo $VOLUME
+#         mkdir -p /mnt/$VOLUME
+#         umount /mnt/$VOLUME || true
+#         done

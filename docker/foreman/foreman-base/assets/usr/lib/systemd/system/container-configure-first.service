@@ -1,0 +1,11 @@
+[Unit]
+Description=Configure Container server upon the first start
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/container-init
+ExecStartPost=/usr/sbin/container-check
+FailureAction=poweroff
+StandardOutput=tty
+[Install]
+WantedBy=container-up.target

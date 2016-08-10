@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: kube-apiserver
+    version: v0.1.0
+  namespace: kube-system
+  name: kube-apiserver
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-apiserver
+    image: docker.io/port/system-kube:latest
+    ports:
+    - containerPort: 6443
+      hostPort: 6443
+      name: kube
+    command:
+    - /hyperkube
+    - apiserver
+    - --alsologtostderr=true
+    - --bind-address=0.0.0.0
+    - --secure-port=6443
+    - --v=2
+    - --etcd_servers=https://etcd-kube.{{OS_DOMAIN}}:4002
+    - --etcd-cafile=/etc/harbor/auth/host/ca.crt
+    - --etcd-certfile=/etc/harbor/auth/host/host.crt
+    - --etcd-keyfile=/etc/harbor/auth/host/host.key
+    - --tls-cert-file=/etc/harbor/auth/kubernetes/kubernetes.crt
+    - --tls-private-key-file=/etc/harbor/auth/kubernetes/kubernetes.key
+    - --client-ca-file=/etc/harbor/auth/kubernetes/ca.crt
+    - --kubelet-certificate-authority=/etc/harbor/auth/kubelet/ca.crt
+    - --kubelet-client-certificate=/etc/harbor/auth/kubelet/kubelet.crt
+    - --kubelet-client-key=/etc/harbor/auth/kubelet/kubelet.key
+    - --insecure-bind-address=127.0.0.1
+    - --insecure-port=8080
+    - --allow_privileged=true
+    - --service-cluster-ip-range=10.100.0.0/24
+    - --service-node-port-range=22-30000
+    - --runtime-config=extensions/v1beta1/daemonsets=true,extensions/v1beta1/jobs=true
+    volumeMounts:
+      - mountPath: /etc/harbor/auth/host
+        name: os-ssl-host
+      - mountPath: /etc/harbor/auth/kubernetes
+        name: os-ssl-kubernetes
+      - mountPath: /etc/harbor/auth/kubelet
+        name: os-ssl-kubelet
+  volumes:
+  - name: os-ssl-host
+    hostPath:
+      path: "/etc/harbor/auth/host"
+  - name: os-ssl-kubernetes
+    hostPath:
+      path: "/etc/harbor/auth/kubernetes"
+  - name: os-ssl-kubelet
+    hostPath:
+      path: "/etc/harbor/auth/kubelet"

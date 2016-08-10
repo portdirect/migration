@@ -1,0 +1,18 @@
+[Unit]
+Description=Docker Bootstrap Application Container Engine
+Documentation=https://docs.docker.com
+After=network-online.target cloud-init.service chronyd.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/docker-bootstrap-daemon
+MountFlags=slave
+LimitNOFILE=1048576
+LimitNPROC=1048576
+LimitCORE=infinity
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

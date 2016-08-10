@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: undercloud-memcached
+    version: v0.1.0
+  name: undercloud-memcached
+  namespace: node-memcached
+spec:
+  hostNetwork: true
+  containers:
+  - name: undercloud-mariadb
+    image: docker.io/port/undercloud-memcached:latest
+    ports:
+      - containerPort: 11211
+        hostPort: 11211
+        name: memcached
+    env:
+      - name: EXPOSED_IP
+        value: {{EXPOSED_IP}}
+    command:
+      - /start.sh

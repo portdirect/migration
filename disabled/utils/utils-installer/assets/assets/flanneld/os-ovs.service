@@ -1,0 +1,95 @@
+[Unit]
+Description=OpenVSwitch
+After=network.target docker-bootstrap.service
+Before=docker.service
+Requires=etcd.service docker-bootstrap.service
+
+[Service]
+StandardOutput=null
+TimeoutStartSec=0
+RemainAfterExit=yes
+Type=simple
+ExecStartPre=-/usr/sbin/modprobe openvswitch
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock stop ovs
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock kill ovs
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock rm ovs
+ExecStart=/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock run \
+              --name ovs \
+              --restart=always \
+              -d \
+              --net=host \
+              --privileged \
+              --cap-add NET_ADMIN \
+              -v /dev/net:/dev/net \
+              -v /var/run/openvswitch:/usr/local/var/run/openvswitch \
+              docker.io/socketplane/openvswitch:latest
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+RequiredBy=docker.service
+
+
+
+
+# Edit this variable: the 'other' host.
+REMOTE_IP=10.140.0.1
+REMOTE_IP=10.140.94.69
+# Edit this variable: the bridge address on 'this' host.
+BRIDGE_ADDRESS=10.96.8.1/24
+BRIDGE_ADDRESS=10.96.83.1/24
+# Name of the bridge (should match /etc/default/docker).
+BRIDGE_NAME=docker0
+OVS_BRIDGE_NAME=${BRIDGE_NAME}_ovs
+# bridges
+
+# Deactivate the docker0 bridge
+ip link set $BRIDGE_NAME down
+# Remove the docker0 bridge
+brctl delbr $BRIDGE_NAME
+# Delete the Open vSwitch bridge
+ovs-vsctl del-br $OVS_BRIDGE_NAME
+# Add the docker0 bridge
+brctl addbr $BRIDGE_NAME
+# Set up the IP for the docker0 bridge
+ip a add $BRIDGE_ADDRESS dev $BRIDGE_NAME
+# Activate the bridge
+ip link set $BRIDGE_NAME up
+# Add the br0 Open vSwitch bridge
+ovs-vsctl add-br $OVS_BRIDGE_NAME
+# Create the tunnel to the other host and attach it to the
+# br0 bridge
+ovs-vsctl add-port $OVS_BRIDGE_NAME gre0 -- set interface gre0 type=gre options:remote_ip=$REMOTE_IP
+# Add the br0 bridge to docker0 bridge
+brctl addif $BRIDGE_NAME $OVS_BRIDGE_NAME
+
+ovs-vsctl show
+
+
+# iptables rules
+
+# Enable NAT
+LOCAL_SUBNET=10.96.8.0/24
+LOCAL_SUBNET=10.96.83.0/24
+iptables -t nat -A POSTROUTING -s ${LOCAL_SUBNET} ! -d${LOCAL_SUBNET} -j MASQUERADE
+# Accept incoming packets for existing connections
+iptables -A FORWARD -o ${BRIDGE_NAME} -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+# Accept all non-intercontainer outgoing packets
+iptables -A FORWARD -i ${BRIDGE_NAME} ! -o ${BRIDGE_NAME} -j ACCEPT
+# By default allow all outgoing traffic
+iptables -A FORWARD -i ${BRIDGE_NAME} -o ${BRIDGE_NAME} -j ACCEPT
+
+# Restart Docker daemon to use the new BRIDGE_NAME
+service docker restart
+
+
+
+. /etc/sysconfig/docker
+. /etc/sysconfig/docker-storage
+/usr/bin/docker daemon \
+                --bridge=docker0 \
+                $OPTIONS \
+                $DOCKER_STORAGE_OPTIONS \
+                $BLOCK_REGISTRY \
+                $INSECURE_REGISTRY

@@ -1,0 +1,30 @@
+<%#
+kind: PXELinux
+name: Kickstart default PXELinux
+oses:
+- CentOS
+- Fedora
+- RedHat
+%>
+#
+# This file was deployed via '<%= @template_name %>' template
+#
+# Supported host/hostgroup parameters:
+#
+# blacklist = module1, module2
+#   Blacklisted kernel modules
+#
+<%
+  options = []
+  if @host.params['blacklist']
+    options << "modprobe.blacklist=" + @host.params['blacklist'].gsub(' ', '')
+  end
+  options = options.join(' ')
+-%>
+
+DEFAULT linux
+
+LABEL linux
+    KERNEL <%= @kernel %>
+    APPEND initrd=<%= @initrd %> ks=<%= foreman_url('provision') %> inst.stage2=http://installer.harboros.net:8013/installer/images repo=<%= @host.operatingsystem.medium_uri(@host) %> ks.device=bootif network ks.sendmac <%= options %>
+    IPAPPEND 2

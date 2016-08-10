@@ -1,0 +1,148 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: loadbalancer
+  namespace: gantry
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: loadbalancer-ssl
+  namespace: gantry
+type: Opaque
+data:
+  loadbalancers-frontend-ssl-key: {{LOADBALANCERS_FRONTEND_SSL_KEY}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: loadbalancer
+    version: v0.1.0
+  name: loadbalancers
+  namespace: gantry
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        openstack-app: loadbalancer
+        version: v0.1.0
+      name: loadbalancers
+      namespace: gantry
+    spec:
+      nodeSelector:
+        openstack-loadbalancers: 'true'
+        arch: 'x86'
+      containers:
+        - name: gantry-frontend
+          image: docker.io/port/haproxy-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              name: http
+              protocol: TCP
+            - containerPort: 443
+              name: https
+              protocol: TCP
+            - containerPort: 1936
+              name: stats
+              protocol: TCP
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: haproxy-config
+              mountPath: /etc/haproxy
+              readOnly: true
+            - name: haproxy-logs
+              mountPath: /var/log/haproxy
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: gantry-openstack-nginx
+          image: docker.io/port/nginx-mass:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+        - name: gantry-openstack-sniproxy
+          image: docker.io/port/sniproxy-base:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+        - name: gantry-kube-2-hapro
+          image: docker.io/port/haproxy-kube:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          command:
+            - /service_loadbalancer
+            - --cfg=/etc/kube2lb/loadbalancer.json
+            - --kubeconfig=/etc/harbor/auth/kubelet/kubeconfig.yaml
+            - --use-kubernetes-cluster-service=false
+            - --server=https://kubernetes.{{OS_DOMAIN}}
+            - --tcp-services=freeipa-master:80,os-keystone:80,os-keystone-v2:80,os-horizon:80,os-glance:80,os-neutron:80,os-nova:80,os-nova-ec2:80,os-metadata:80,os-serial:80,os-spice:80,os-novnc:80,os-cinder:80,os-heat:80,os-heat-cfn:80
+            - --target-service=freeipa-master:443,os-ipsilon:443,os-accounts:443,os-password:443,os-database:3306,os-mongodb:27017,os-messaging:5672,os-keystone:443,os-keystone-admin:35357,os-keystone-v2:443,os-keystone-v2-admin:35357,os-horizon:443,os-glance:443,os-glance-registry:443,os-neutron:443,os-nova:443,os-nova-ec2:443,os-metadata:443,os-serial:443,os-spice:443,os-novnc:443,os-cinder:443,os-heat:443,os-heat-cloudwatch:443,os-heat-cfn:443,os-murano:443,os-murano-messaging:5672,os-swift:443,os-ceilometer:443,os-gnocchi:443,os-grafana:443,os-cloudkitty:443,os-barbican:443,os-magnum:443,os-trove:443,os-trove-messaging:5676,os-manila:443,os-designate:443
+          volumeMounts:
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: kubeconfig
+              mountPath: /etc/harbor/auth/kubelet/kubeconfig.yaml
+              readOnly: true
+            - name: haproxy-config
+              mountPath: /etc/haproxy
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: loadbalancer
+        - name: os-ssl
+          secret:
+            secretName: loadbalancer-ssl
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: kubeconfig
+          hostPath:
+            path: /etc/harbor/auth/kubelet/kubeconfig.yaml
+        - name: haproxy-config
+          emptyDir: {}
+        - name: haproxy-logs
+          emptyDir: {}

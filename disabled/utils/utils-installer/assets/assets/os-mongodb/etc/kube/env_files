@@ -1,0 +1,4 @@
+/etc/os-common/common.env
+/etc/freeipa/credentials-client-provisioning.env
+/etc/os-mongodb/os-mongodb.env
+/etc/os-mongodb/credentials-os-mongodb.env

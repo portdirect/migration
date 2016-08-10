@@ -1,0 +1,11 @@
+# CentOS-OpenStack-mitaka.repo
+#
+# Please see http://wiki.centos.org/SpecialInterestGroup/Cloud for more
+# information
+
+[centos-openstack-mitaka]
+name=CentOS-7 - OpenStack mitaka
+baseurl=http://mirror.centos.org/centos/7/cloud/$basearch/openstack-mitaka/
+gpgcheck=0
+enabled=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-Cloud

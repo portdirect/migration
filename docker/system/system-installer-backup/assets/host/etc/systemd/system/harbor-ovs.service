@@ -1,0 +1,47 @@
+[Unit]
+Description=OpenvSwitch
+After=network.target docker-ovs.service
+Before=docker.service
+After=docker-ovs.service harbor-network-bootstrap.service
+Requires=docker-ovs.service harbor-network-bootstrap.service
+
+[Service]
+StandardOutput=null
+TimeoutStartSec=0
+RemainAfterExit=yes
+Type=simple
+ExecStartPre=/usr/sbin/modprobe openvswitch
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-ovs.sock pull  docker.io/port/system-ovs:latest
+
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-ovs.sock stop ovs-install
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-ovs.sock kill ovs-install
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-ovs.sock rm ovs-install
+ExecStartPre=/usr/bin/docker -H unix:///var/run/docker-ovs.sock run \
+              --name ovs-install \
+              --net=host \
+              -v /:/host \
+               docker.io/port/system-ovs:latest harbor-install
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-ovs.sock stop ovs-install
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-ovs.sock kill ovs-install
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-ovs.sock rm ovs-install
+
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-ovs.sock stop ovs
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-ovs.sock kill ovs
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-ovs.sock rm ovs
+ExecStartPre=/usr/bin/docker -H unix:///var/run/docker-ovs.sock run \
+              --name ovs \
+              --restart=always \
+              -d \
+              --net=host \
+              --privileged \
+              --cap-add NET_ADMIN \
+              -v /dev/net:/dev/net \
+              -v /var/run/openvswitch:/var/run/openvswitch \
+               docker.io/port/system-ovs:latest
+ExecStart=/usr/bin/docker -H unix:///var/run/docker-ovs.sock inspect ovs
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

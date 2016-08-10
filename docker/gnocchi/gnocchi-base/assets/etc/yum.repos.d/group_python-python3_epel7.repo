@@ -1,0 +1,8 @@
+[group_python-python3_epel7]
+name=Copr repo for python3_epel7 owned by orion
+baseurl=https://copr-be.cloud.fedoraproject.org/results/@python/python3_epel7/epel-7-$basearch/
+skip_if_unavailable=True
+gpgcheck=1
+gpgkey=https://copr-be.cloud.fedoraproject.org/results/@python/python3_epel7/pubkey.gpg
+enabled=1
+enabled_metadata=1

@@ -1,0 +1,7 @@
+#!/bin/bash
+
+echo "dn: cn=config
+changetype: modify
+replace: nsslapd-allow-anonymous-access
+nsslapd-allow-anonymous-access: rootdse" | \
+ldapmodify -h $(hostname -f) -p 389 -D "cn=Directory Manager" -c -x -w "$@"

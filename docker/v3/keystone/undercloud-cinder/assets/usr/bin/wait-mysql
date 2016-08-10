@@ -1,0 +1,16 @@
+#!/bin/sh
+check_for_db() {
+    local database=${1:-mysql}
+
+    mysql -h ${MARIADB_SERVICE_HOST} -u root -p"${DB_ROOT_PASSWORD}" \
+        -e "select 1" $database > /dev/null 2>&1 || {
+        echo "ERROR: database $database is not available @ $MARIADB_SERVICE_HOST" >&2
+        return 1
+    }
+
+    echo "database is active @ ${MARIADB_SERVICE_HOST}"
+}
+
+until check_for_db; do \
+    sleep 1 && echo .;
+done;

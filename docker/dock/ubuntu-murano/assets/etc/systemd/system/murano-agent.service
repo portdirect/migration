@@ -1,0 +1,21 @@
+[Unit]
+Description=OpenStack Murano Agent
+After=postgresql.service mysql.service keystone.service rabbitmq-server.service cloud-config.service cloud-final.service
+Requires=cloud-final.service
+
+
+[Service]
+User=root
+Group=root
+Type=simple
+WorkingDirectory=/var/lib/murano
+ExecStart=/usr/bin/muranoagent --config-file=/etc/murano/agent.conf
+RestartSec=2
+Restart=on-failure
+LimitNOFILE=65535
+TimeoutStopSec=15
+# Output needs to appear in instance console output
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target

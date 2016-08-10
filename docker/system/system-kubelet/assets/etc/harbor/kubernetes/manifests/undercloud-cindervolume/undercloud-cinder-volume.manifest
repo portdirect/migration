@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: undercloud-cinder-volume-lvm
+    version: v0.1.0
+  name: undercloud-cinder-volume-lvm
+  namespace: node-cinder
+spec:
+  hostNetwork: true
+  containers:
+  - name: undercloud-cinder-volume-lvm
+    image: docker.io/port/undercloud-cinder:latest
+    env:
+      - name: EXPOSED_IP
+        value: {{EXPOSED_IP}}
+      - name: MARIADB_SERVICE_HOST
+        value: {{MARIADB_SERVICE_HOST}}
+      - name: RABBITMQ_SERVICE_HOST
+        value: {{RABBITMQ_SERVICE_HOST}}
+      - name: MEMCACHED_SERVICE_HOST
+        value: {{MEMCACHED_SERVICE_HOST}}
+      - name: KEYSTONE_SERVICE_HOST
+        value: {{KEYSTONE_SERVICE_HOST}}
+      - name: NOVA_METADATA_SERVICE_HOST
+        value: {{NOVA_METADATA_SERVICE_HOST}}
+      - name: GLANCE_SERVICE_HOST
+        value: {{GLANCE_SERVICE_HOST}}
+      - name: NOVA_SERVICE_HOST
+        value: {{NOVA_SERVICE_HOST}}
+      - name: NEUTRON_SERVICE_HOST
+        value: {{NEUTRON_SERVICE_HOST}}
+      - name: CINDER_SERVICE_HOST
+        value: {{CINDER_SERVICE_HOST}}
+      - name: DB_ROOT_PASSWORD
+        value: password
+      - name: KEYSTONE_ADMIN_PASSWORD
+        value: password
+    securityContext:
+      privileged: true
+    command:
+      - /start-volume-lvm.sh
+    volumeMounts:
+      - mountPath: /dev
+        name: dev
+  volumes:
+    - name: dev
+      hostPath:
+        path: /dev

@@ -1,0 +1,46 @@
+$font-path: $static_url + "themes/harbor/assets/fonts/patternfly";
+$navbar-pf-alt-bg-img: url( $static_url + "themes/harbor/assets/images/patternfly/bg-navbar-pf-alt.svg") !default;
+$img-path: $static_url + "themes/harbor/assets/images/patternfly" !default;
+
+
+
+$nav-pf-vertical-active-color:                                      #0099d3 !default;
+// $nav-pf-vertical-active-before-color:                               #199dde !default;
+$nav-pf-vertical-active-bg-color:                                   #fff !default;
+$nav-pf-vertical-active-border-color:                               #f2f2f2 !default;
+// $nav-pf-vertical-active-font-weight:                                600 !default;
+// $nav-pf-vertical-active-icon-color:                                 #199dde !default;
+$nav-pf-vertical-badge-color:                                       #333 !default;
+$nav-pf-vertical-bg-color:                                          #eeeeec !default;
+$nav-pf-vertical-border-color:                                      #d0d0d0 !default;
+// $nav-pf-vertical-collapsed-width:                                   75px !default;
+$nav-pf-vertical-color:                                             #333 !default;
+// $nav-pf-vertical-font-weight:                                       400 !default;
+$nav-pf-vertical-icon-color:                                        #333 !default;
+// $nav-pf-vertical-icon-width:                                        24px !default;
+$nav-pf-vertical-item-border-color:                                 #d0d0d0 !default;
+// $nav-pf-vertical-link-height:                                       63px !default;
+// $nav-pf-vertical-link-padding:                                      17px 20px 17px 25px !default;
+$nav-pf-vertical-secondary-active-color:                            #0099d3 !default;
+$nav-pf-vertical-secondary-active-bg-color:                         #fff !default;
+// $nav-pf-vertical-secondary-active-icon-color:                       #199dde !default;
+$nav-pf-vertical-secondary-badge-color:                             #333 !default;
+// $nav-pf-vertical-secondary-badge-bg-color:                          $color-pf-black-900 !default;
+// $nav-pf-vertical-secondary-border-color:                            #199dde !default;
+$nav-pf-vertical-secondary-color:                                   #333 !default;
+// $nav-pf-vertical-secondary-header-margin:                           18px 20px 10px 20px !default;
+// $nav-pf-vertical-secondary-indicator-color:                         $color-pf-black-600 !default;
+// $nav-pf-vertical-secondayr-indicator-padding:                       17px 0 !default;
+$nav-pf-vertical-secondary-item-color:                              #333 !default;
+// $nav-pf-vertical-secondary-item-padding:                            0 0 5px 0 !default;
+// $nav-pf-vertical-secondary-link-height:                             63px !default;
+// $nav-pf-vertical-secondary-link-padding:                            0 15px 0 20px !default;
+// $nav-pf-vertical-secondary-list-header-margin:                      30px 20px 10px 20px !default;
+// $nav-pf-vertical-secondary-width:                                   250px !default;
+// $nav-pf-vertical-width:                                             200px !default;
+
+
+
+
+@import "assets/stylesheets/patternfly/variables";
+@import "/themes/default/variables";

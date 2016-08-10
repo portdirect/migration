@@ -1,0 +1,303 @@
+#!/bin/bash
+
+
+
+
+
+
+
+echo "--------------------------------------------------------------"
+echo "HarborOS: Configuring Docker"
+echo "--------------------------------------------------------------"
+
+
+
+
+
+
+
+
+
+
+
+HOST_IP=$(/sbin/ip route|awk '/default/ { print $3 }')
+ETH0_IP=$(ip addr ls eth0 | awk '/inet / {split($2, ary, /\//); print ary[1]}')
+
+cat > /etc/etcd/etcd.conf << EOF
+# [member]
+ETCD_NAME=default
+ETCD_DATA_DIR="/var/lib/etcd/default.etcd"
+#ETCD_SNAPSHOT_COUNTER="10000"
+#ETCD_HEARTBEAT_INTERVAL="100"
+#ETCD_ELECTION_TIMEOUT="1000"
+#ETCD_LISTEN_PEER_URLS="http://127.0.0.1:2380"
+ETCD_LISTEN_CLIENT_URLS="http://127.0.0.1:2379,http://${ETH0_IP}:4001"
+#ETCD_MAX_SNAPSHOTS="5"
+#ETCD_MAX_WALS="5"
+#ETCD_CORS=""
+#
+#[cluster]
+#ETCD_INITIAL_ADVERTISE_PEER_URLS="http://127.0.0.1:2380"
+# if you use different ETCD_NAME (e.g. test), set ETCD_INITIAL_CLUSTER value for this name, i.e. "test=http://..."
+ETCD_INITIAL_CLUSTER="master=http://${HOST_IP}:7001"
+#ETCD_INITIAL_CLUSTER_STATE="new"
+#ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster"
+ETCD_ADVERTISE_CLIENT_URLS="http://${ETH0_IP}:4001"
+#ETCD_DISCOVERY=""
+#ETCD_DISCOVERY_SRV=""
+#ETCD_DISCOVERY_FALLBACK="proxy"
+#ETCD_DISCOVERY_PROXY=""
+#
+#[proxy]
+ETCD_PROXY="on"
+#
+#[security]
+#ETCD_CERT_FILE=""
+#ETCD_KEY_FILE=""
+#ETCD_CLIENT_CERT_AUTH="false"
+#ETCD_TRUSTED_CA_FILE=""
+#ETCD_PEER_CERT_FILE=""
+#ETCD_PEER_KEY_FILE=""
+#ETCD_PEER_CLIENT_CERT_AUTH="false"
+#ETCD_PEER_TRUSTED_CA_FILE=""
+#
+#[logging]
+#ETCD_DEBUG="false"
+# examples for -log-package-levels etcdserver=WARNING,security=DEBUG
+#ETCD_LOG_PACKAGE_LEVELS=""
+EOF
+
+
+
+
+
+
+
+cat > /etc/sysconfig/flanneld << EOF
+# Flanneld configuration options  
+
+# etcd url location.  Point this to the server where etcd runs
+FLANNEL_ETCD="http://127.0.0.1:2379"
+
+# etcd config key.  This is the configuration key that flannel queries
+# For address range assignment
+FLANNEL_ETCD_KEY="/coreos.com/network"
+
+# Any additional options that you want to pass
+#FLANNEL_OPTIONS=""
+
+EOF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+cat > /etc/sysconfig/docker << EOF
+# /etc/sysconfig/docker
+
+# Modify these options if you want to change the way the docker daemon runs
+OPTIONS='--selinux-enabled -s overlay'
+
+DOCKER_CERT_PATH=/etc/docker
+
+# If you want to add your own registry to be used for docker search and docker
+# pull use the ADD_REGISTRY option to list a set of registries, each prepended
+# with --add-registry flag. The first registry added will be the first registry
+# searched.
+# ADD_REGISTRY='--add-registry registry.access.redhat.com'
+
+# If you want to block registries from being used, uncomment the BLOCK_REGISTRY
+# option and give it a set of registries, each prepended with --block-registry
+# flag. For example adding docker.io will stop users from downloading images
+# from docker.io
+# BLOCK_REGISTRY='--block-registry'
+
+# If you have a registry secured with https but do not have proper certs
+# distributed, you can tell docker to not look for full authorization by
+# adding the registry to the INSECURE_REGISTRY line and uncommenting it.
+# INSECURE_REGISTRY='--insecure-registry'
+
+# On an SELinux system, if you remove the --selinux-enabled option, you
+# also need to turn on the docker_transition_unconfined boolean.
+# setsebool -P docker_transition_unconfined 1
+
+# Location used for temporary files, such as those created by
+# docker load and build operations. Default is /var/lib/docker/tmp
+# Can be overriden by setting the following environment variable.
+# DOCKER_TMPDIR=/var/tmp
+
+# Controls the /etc/cron.daily/docker-logrotate cron job status.
+# To disable, uncomment the line below.
+# LOGROTATE=false
+
+EOF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+cat > ${MOUNT}/usr/lib/systemd/system/kubelet-prep.service << EOF
+[Unit]
+Description=Kubernetes Kubelet Prep Service
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+ExecStart=/usr/bin/mkdir -p /var/lib/kubelet
+RemainAfterExit=true
+Type=oneshot
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+
+
+cat > ${MOUNT}/usr/lib/systemd/system/kubelet.service << EOF
+[Unit]
+Description=Kubernetes Kubelet Server
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+After=kubelet-prep.service
+Requires=kubelet-prep.service
+After=docker.service
+Requires=docker.service
+
+[Service]
+WorkingDirectory=/var/lib/kubelet
+EnvironmentFile=-/etc/kubernetes/config
+EnvironmentFile=-/etc/kubernetes/kubelet
+ExecStart=/usr/bin/kubelet \
+	    \$KUBE_LOGTOSTDERR \
+	    \$KUBE_LOG_LEVEL \
+	    \$KUBELET_API_SERVER \
+	    \$KUBELET_ADDRESS \
+	    \$KUBELET_PORT \
+	    \$KUBELET_HOSTNAME \
+	    \$KUBE_ALLOW_PRIV \
+	    \$KUBELET_ARGS
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#which will be the same on all hosts to contain:
+cat > /etc/kubernetes/config << EOF
+###
+# kubernetes system config
+#
+# The following values are used to configure various aspects of all
+# kubernetes services, including
+#
+#   kube-apiserver.service
+#   kube-controller-manager.service
+#   kube-scheduler.service
+#   kubelet.service
+#   kube-proxy.service
+# logging to stderr means we get it in the systemd journal
+KUBE_LOGTOSTDERR="--logtostderr=true"
+
+# journal message level, 0 is debug
+KUBE_LOG_LEVEL="--v=0"
+
+# Should this cluster be allowed to run privileged docker containers
+KUBE_ALLOW_PRIV="--allow_privileged=false"
+
+# How the controller-manager, scheduler, and proxy find the apiserver
+KUBE_MASTER="--master=http://${HOST_IP}:8080"
+EOF
+
+
+
+
+
+
+
+
+
+
+cat > /etc/kubernetes/kubelet << EOF
+###
+# kubernetes kubelet (minion) config
+
+# The address for the info server to serve on (set to 0.0.0.0 or "" for all interfaces)
+KUBELET_ADDRESS="--address=0.0.0.0"
+
+# The port for the info server to serve on
+# KUBELET_PORT="--port=10250"
+
+# You may leave this blank to use the actual hostname
+KUBELET_HOSTNAME=""
+
+# location of the api-server
+KUBELET_API_SERVER="--api_servers=http://${HOST_IP}:8080"
+
+# Add your own!
+#KUBELET_ARGS="--docker-endpoint=tcp://127.0.0.1:2375"
+EOF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+for SERVICES in etcd docker kubelet; do 
+    systemctl start $SERVICES 
+    sleep 2s
+    systemctl status $SERVICES 
+done
+
+
+
+docker run --name dockervisor --privileged -d -v /sys/fs/cgroup:/sys/fs/cgroup:ro -p 9090:9090 -p 10250 -p 22 cannyos/dockervisor
+

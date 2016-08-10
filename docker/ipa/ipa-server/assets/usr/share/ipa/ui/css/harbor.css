@@ -1,0 +1,63 @@
+.facet-controls.clearfix {
+    border-top: 1px solid #d1d1d1;
+}
+
+.login-pf-body {
+    height: 100%;
+    background: #080808 url("https://api.port.direct/static/themes/harbor/assets/images/patternfly/bg-login.jpg") no-repeat center center fixed !important;
+    -webkit-background-size: cover !important;
+    -moz-background-size: cover !important;
+    -o-background-size: cover !important;
+    background-size: cover !important;
+    color: #ffffff;
+}
+
+.login {
+    margin-top: inherit;
+}
+.login-pf #brand img{
+  display: none;
+}
+
+#brand:before {
+  font-size: 36px;
+  text-transform: uppercase;
+  content: 'port.direct authority';
+  font-weight: bold;
+}
+
+.login-pf .status {
+  margin-top: 2em;
+}
+
+.login-pf .container {
+    background-color: rgba(0, 0, 0, 0.6) !important;
+    padding-top: 84px;
+
+}
+
+
+.login-pf #brand {
+    position: absolute;
+    top: -72px;
+}
+
+
+.navbar-pf-alt .navbar-brand .navbar-brand-name {
+    line-height: 35px;
+    text-transform: uppercase;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+
+.navbar-pf .navbar-brand img{
+  display: none;
+}
+
+
+.navbar-pf .navbar-brand:before {
+  text-transform: uppercase;
+  content: 'port.direct authority';
+  font-weight: bold;
+}

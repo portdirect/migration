@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+DISC_REPORTER="ha_$(uuidgen)"
+/usr/local/bin/harbor-docker run \
+              --name=${DISC_REPORTER} \
+              --net=host \
+              -v /dev:/dev \
+               docker.io/port/system-discs:latest report-discs
+/usr/local/bin/harbor-docker rm ${DISC_REPORTER}&> /dev/null

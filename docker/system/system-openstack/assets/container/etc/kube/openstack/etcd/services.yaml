@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: etcd
+  name: etcd
+  namespace: os-etcd
+spec:
+  ports:
+  - port: 4001
+    targetPort: 4001
+    protocol: TCP
+    name: etcd
+  selector:
+    openstack-app: etcd

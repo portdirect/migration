@@ -1,0 +1,5 @@
+[google-cloud-compute]
+name=Google Cloud Compute
+baseurl=https://packages.cloud.google.com/yum/repos/google-cloud-compute-el7-x86_64
+enabled=1
+gpgcheck=0

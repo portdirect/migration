@@ -1,0 +1,615 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: public
+  namespace: gantry
+spec:
+  type: NodePort
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 80
+    nodePort: 80
+    protocol: TCP
+    targetPort: 80
+    name: http
+  - port: 443
+    nodePort: 443
+    protocol: TCP
+    targetPort: 443
+    name: https
+  - port: 1936
+    nodePort: 1936
+    protocol: TCP
+    targetPort: 1936
+    name: stats
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: ipsilon
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 4143
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: accounts
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 4433
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: password
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 44333
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: api
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+    name: http
+  - port: 443
+    protocol: TCP
+    targetPort: 443
+    name: https
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: database
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 3306
+    protocol: TCP
+    targetPort: 3306
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: mongodb
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 27017
+    protocol: TCP
+    targetPort: 27017
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: messaging
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 5672
+    protocol: TCP
+    targetPort: 5672
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: cinder
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 8776
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: glance
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 9292
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: glance-registry
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 9191
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: heat-cfn
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 8000
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: heat-cloudwatch
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 8003
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: heat
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 8004
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: keystone
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    name: api
+    protocol: TCP
+    targetPort: 5000
+  - port: 35357
+    name: admin
+    protocol: TCP
+    targetPort: 35357
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: keystone-v2
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    name: api
+    protocol: TCP
+    targetPort: 5001
+  - port: 35357
+    name: admin
+    protocol: TCP
+    targetPort: 35358
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: metadata
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 80
+    name: http
+    protocol: TCP
+    targetPort: 8776
+  - port: 443
+    name: https
+    protocol: TCP
+    targetPort: 8775
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: neutron
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 9696
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: nova-ec2
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 8773
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: nova
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 8774
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: novnc
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 6080
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: serial
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 6083
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: spice
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 6082
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: murano
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 8082
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: murano-messaging
+  namespace: gantry
+spec:
+  type: NodePort
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 5672
+    nodePort: 5672
+    protocol: TCP
+    targetPort: 5671
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: swift
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 8088
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: ceilometer
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 8777
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: gnocchi
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 8041
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: grafana
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: cloudkitty
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 8888
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: barbican
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 9311
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: magnum
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 9511
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: trove
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 8779
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: trove-messaging
+  namespace: gantry
+spec:
+  type: NodePort
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 5676
+    nodePort: 5676
+    protocol: TCP
+    targetPort: 5676
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: manila
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 8786
+  selector:
+    openstack-app: loadbalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: loadbalancer
+  name: foreman
+  namespace: gantry
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 44340
+  - port: 443
+    protocol: TCP
+    targetPort: 44339
+  selector:
+    openstack-app: loadbalancer

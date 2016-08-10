@@ -1,0 +1,5 @@
+[infrastructure7-testing]
+name=infrastructure7-testing
+baseurl=http://cbs.centos.org/repos/infrastructure7-testing/x86_64/os/
+enabled=1
+gpgcheck=0

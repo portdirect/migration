@@ -1,0 +1,5 @@
+#!/bin/sh
+# This hack prevents iptables from ever returning an error:
+# allowing provisioning systems to run that expect to be running with NET_ADMIN
+# capabilities to run without.
+/sbin/.iptables $@ || true

@@ -1,0 +1,182 @@
+
+
+if [ ! -d /opt/flocker ] ; then
+  docker-bootstrap create \
+      --name flocker-node-installer \
+      -v /opt/flocker \
+      port/system-flocker:latest
+  FLOCKER_VENV_MOUNT=$(docker-bootstrap inspect --format '{{ range .Mounts }}{{ if eq .Destination "/opt/flocker" }}{{ .Source }}{{ end }}{{ end }}' flocker-node-installer)
+  ln -s ${FLOCKER_VENV_MOUNT} /opt/flocker
+fi
+
+docker run     \
+-it --rm     \
+--name flocker-ca     \
+-v /etc/flocker:/etc/flocker:rw    \
+ port/system-flocker:latest /bin/bash -c "cd /etc/flocker; flocker-ca initialize flocker.$(hostname -d)"
+
+docker run \
+-it --rm \
+--name flocker-ca \
+-v /etc/flocker:/etc/flocker:rw \
+port/system-flocker:latest /bin/bash -c "cd /etc/flocker && \
+    flocker-ca create-control-certificate flocker.$(hostname -d) && \
+    mv control-flocker.$(hostname -d).crt control-service.crt && \
+    mv control-flocker.$(hostname -d).key control-service.key && \
+    ls control-service.crt && \
+    ls control-service.key && \
+    ls cluster.crt"
+
+docker run \
+-it --rm \
+--name flocker-ca \
+-v /etc/flocker:/etc/flocker:rw \
+port/system-flocker:latest /bin/bash -c "cd /etc/flocker && \
+    mkdir node && \
+    flocker-ca create-node-certificate --outputpath=./node && \
+    mv ./node/*.crt ./node.crt && \
+    mv ./node/*.key ./node.key"
+
+
+docker run \
+-it --rm \
+--name flocker-ca \
+-v /etc/flocker:/etc/flocker:rw \
+port/system-flocker:latest /bin/bash -c "cd /etc/flocker && \
+    flocker-ca create-api-certificate kubernetes"
+
+
+
+
+
+docker run \
+    -it --rm \
+    --name flocker-controller \
+    --net host \
+    -v /etc/flocker:/etc/flocker:ro \
+    port/system-flocker:latest flocker-control -v
+
+
+docker logs -f flocker-controller
+
+
+cd /etc/flocker-ca/
+
+
+
+cat > /etc/flocker/agent.yml <<EOF
+"version": 1
+"control-service":
+   "hostname": "flocker.port.direct"
+   "port": 4524
+
+"dataset":
+  "backend": "loopback"
+  "root_path": "/var/lib/flocker/loopback"
+EOF
+
+
+
+
+docker run \
+    -it --rm \
+    --name flocker-cli \
+    --net host \
+    -v /etc/flocker:/etc/flocker:ro \
+    port/system-flocker-cli:latest flocker-control
+
+
+
+
+
+
+
+mkdir -p /etc/flocker
+ln -s /etc/harbor/auth/flocker-ca/node/node.key /etc/flocker/node.key
+ln -s /etc/harbor/auth/flocker-ca/node/node.crt /etc/flocker/node.crt
+ln -s /etc/harbor/auth/flocker-ca/cluster.crt /etc/flocker/cluster.crt
+
+
+
+
+docker run \
+    -it --rm \
+    --name flocker-controller \
+    --net host \
+    -v /etc/flocker:/etc/flocker/:rw \
+    port/system-flocker:latest flocker-control
+
+cat > /usr/local/bin/flockerctl <<EOF
+#!/bin/bash
+docker run \
+    -it --rm \
+    --name flocker-cli \
+    --net host \
+    -v /etc/flocker:/etc/flocker:ro \
+    -v /var/run/docker.sock:/var/run/docker.sock:rw \
+    port/system-flocker-cli:latest /init "\$@"
+EOF
+chmod +x /usr/local/bin/flockerctl
+flockerctl list-nodes
+
+curl --cacert /etc/harbor/auth/flocker-ca/cluster.crt --cert /etc/harbor/auth/flocker-ca/kubernetes.crt --key /etc/harbor/auth/flocker-ca/kubernetes.key \
+     https://flocker.$(hostname -d):4523/v1/configuration/containers
+     curl --insecure --cacert /etc/harbor/auth/flocker-ca/cluster.crt --cert /etc/harbor/auth/flocker-ca/kubernetes.crt --key /etc/harbor/auth/flocker-ca/kubernetes.key \
+          https://10.96.59.1:4523/v1/configuration/containers
+
+
+systemctl enable flocker-dataset-agent
+systemctl restart flocker-dataset-agent
+systemctl status flocker-dataset-agent
+
+systemctl enable flocker-container-agent
+systemctl restart flocker-container-agent
+systemctl status flocker-container-agent
+
+
+
+
+
+      - FLOCKER_CONTROL_SERVICE_HOST=10.96.59.1
+      - FLOCKER_CONTROL_SERVICE_PORT=4523
+      - FLOCKER_CONTROL_SERVICE_CA_FILE=/etc/flocker/cluster.crt
+      - FLOCKER_CONTROL_SERVICE_CLIENT_KEY_FILE=/etc/flocker/kubernetes.key
+      - FLOCKER_CONTROL_SERVICE_CLIENT_CERT_FILE=/etc/flocker/kubernetes.key
+flockerctl list-nodes
+flockerctl create -m name=my-flocker-vol -s 10G -n 6d3c5c09
+flockerctl --certs-path /etc/harbor/auth/flocker-ca --user=kubernetes --control-service 10.96.59.1 --control-port=4523 list
+
+
+cat > /tmp/test.yaml <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: flocker-web
+spec:
+  containers:
+    - name: web
+      image: nginx
+      ports:
+        - name: web
+          containerPort: 80
+      volumeMounts:
+          - name: www-root
+            mountPath: "/usr/share/nginx/html"
+  volumes:
+    - name: www-root
+      flocker:
+        datasetName: my-flocker-vol
+EOF
+
+TARGET=control-service TOKEN="aUeZio/DagOOLR5z5simJvB1DMqb08IMF94sWK+Q6iIcAGAeIsk45wqCsuy6RLWsZGE+WqvBZrQfq2pag8TjmA==" \
+sh -c 'curl -ssL https://get-volumehub.clusterhq.com/ |sh'
+
+kubectl delete -f /rootfs/tmp/test.yaml
+kubectl create -f /rootfs/tmp/test.yaml
+docker run \
+    -ti --rm \
+    --name flocker-cli \
+    --net host \
+    -v /etc/harbor/auth/flocker-ca/:/etc/flocker/:ro \
+    port/system-flocker:latest bash
+flocker-volumes list-nodes

@@ -1,0 +1,29 @@
+[Unit]
+Description=HarborOS: OpenStack: magnum Service
+After=docker.service freeipa.service os-magnum-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=/var/usrlocal/bin/os-magnum-api-preflight.sh
+
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-magnum/kube/os-magnum-api_service.yaml --namespace=os-magnum
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-magnum/kube/os-magnum-api_replicationcontroller.yaml --namespace=os-magnum
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-magnum/kube/os-magnum_secrets.yaml --namespace=os-magnum
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-magnum/kube/os-magnum_secrets.yaml --namespace=os-magnum
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-magnum/kube/os-magnum-api_replicationcontroller.yaml --namespace=os-magnum
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-magnum/kube/os-magnum-api_service.yaml --namespace=os-magnum
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-magnum/kube/os-magnum-api_service.yaml --namespace=os-magnum
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-magnum/kube/os-magnum-api_replicationcontroller.yaml --namespace=os-magnum
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-magnum/kube/os-magnum_secrets.yaml --namespace=os-magnum
+
+[Install]
+WantedBy=multi-user.target

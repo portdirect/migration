@@ -1,0 +1,39 @@
+#!/bin/bash
+source /etc/kube/kube.env
+
+: ${KUBE_DEV:=br0}
+: ${KUBE_PORT:=6443}
+: ${KUBE_SERVICE_SUBNET:="10.112.0.0/16"}
+
+KUBE_IP=$(ip -f inet -o addr show $KUBE_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+
+#KUBE_FIREWALL_ZONE=$(firewall-cmd --get-zone-of-interface=$KUBE_DEV)
+#firewall-cmd --zone=${KUBE_FIREWALL_ZONE} --add-port=${KUBE_PORT}/tcp
+#firewall-cmd --zone=${KUBE_FIREWALL_ZONE} --add-port=6443/tcp
+
+exec harbor-docker run \
+        --name=kube-apiserver \
+        --net='host' \
+        --restart=always \
+        -d \
+        -v /etc/harbor/auth/kubernetes:/etc/harbor/auth/kubernetes \
+        -v /etc/harbor/auth/kubelet:/etc/harbor/auth/kubelet \
+         docker.io/port/x86-kube:latest /hyperkube apiserver \
+            --alsologtostderr=true \
+            --bind-address=0.0.0.0 \
+            --advertise-address=${KUBE_IP} \
+            --v=2 \
+            --etcd_servers=http://127.0.0.1:2379 \
+            --tls-cert-file=/etc/harbor/auth/kubernetes/kubernetes.crt \
+            --tls-private-key-file=/etc/harbor/auth/kubernetes/kubernetes.key \
+            --client-ca-file=/etc/harbor/auth/kubernetes/ca.crt \
+            --kubelet-certificate-authority=/etc/harbor/auth/kubelet/ca.crt \
+            --kubelet-client-certificate=/etc/harbor/auth/kubelet/kubelet.crt \
+            --kubelet-client-key=/etc/harbor/auth/kubelet/kubelet.key \
+            --insecure-bind-address=127.0.0.1 \
+            --insecure-port=8080 \
+            --secure-port=${KUBE_PORT} \
+            --allow_privileged=true \
+            --service-cluster-ip-range=${KUBE_SERVICE_SUBNET} \
+            --service-node-port-range=22-30000 \
+            --runtime-config="extensions/v1beta1/daemonsets=true,extensions/v1beta1/jobs=true"

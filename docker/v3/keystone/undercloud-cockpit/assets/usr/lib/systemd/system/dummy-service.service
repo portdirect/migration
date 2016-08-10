@@ -1,0 +1,10 @@
+[Unit]
+Description=Dummy Service
+
+[Service]
+Type=oneshot
+RemainAfterExit=True
+ExecStart=/bin/true
+
+[Install]
+WantedBy=multi-user.target

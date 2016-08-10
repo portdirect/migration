@@ -1,0 +1,29 @@
+#!/bin/bash
+set -e
+PATH=${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+
+docker stop swarm-manager || true
+docker kill swarm-manager || true
+docker rm -v swarm-manager || true
+
+
+exec docker run -d \
+    --name swarm-manager \
+    --net=host \
+    -v /etc/harbor/auth/host/ca.crt:/etc/harbor/auth/host/ca.crt:ro \
+    -v /etc/harbor/auth/host/host.crt:/etc/harbor/auth/host/host.crt:ro \
+    -v /etc/harbor/auth/host/host.key:/etc/harbor/auth/host/host.key:ro \
+    -v /etc/harbor/auth/docker-swarm/ca.crt:/etc/harbor/auth/docker-swarm/ca.crt:ro \
+    -v /etc/harbor/auth/docker-swarm/docker-swarm.crt:/etc/harbor/auth/docker-swarm/docker-swarm.crt:ro \
+    -v /etc/harbor/auth/docker-swarm/docker-swarm.key:/etc/harbor/auth/docker-swarm/docker-swarm.key:ro \
+    docker.io/port/system-swarm:latest \
+        manage etcd://etcd-docker.${OS_DOMAIN}:4003  \
+        --discovery-opt "kv.cacertfile=/etc/harbor/auth/host/ca.crt" \
+        --discovery-opt "kv.certfile=/etc/harbor/auth/host/host.crt" \
+        --discovery-opt "kv.keyfile=/etc/harbor/auth/host/host.key" \
+        --tlsverify \
+        --tlscacert=/etc/harbor/auth/docker-swarm/ca.crt \
+        --tlscert=/etc/harbor/auth/docker-swarm/docker-swarm.crt \
+        --tlskey=/etc/harbor/auth/docker-swarm/docker-swarm.key \
+        -H tcp://docker-swarm.${OS_DOMAIN}:4000

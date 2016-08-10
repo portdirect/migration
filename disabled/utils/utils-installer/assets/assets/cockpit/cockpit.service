@@ -1,0 +1,21 @@
+[Unit]
+Description=HarborOS: Cockpit Service
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+
+ExecStartPre=-/usr/bin/docker kill cockpit
+ExecStartPre=-/usr/bin/docker rm cockpit
+ExecStartPre=-/usr/bin/docker pull registry.harboros.net:3040/harboros/cockpit:latest
+ExecStartPre=/usr/bin/docker run --name cockpit -d --privileged --pid=host -v /:/host docker.io/port/cockpit:latest
+
+ExecStart=/usr/bin/docker logs -f cockpit
+ExecStop=/usr/bin/docker stop cockpit
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

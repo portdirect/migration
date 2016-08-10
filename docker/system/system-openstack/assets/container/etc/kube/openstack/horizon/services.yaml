@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: horizon-database
+  name: horizon-database
+  namespace: os-horizon
+spec:
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 3306
+    targetPort: 3306
+    name: mysql
+  selector:
+    openstack-app: horizon-database
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: horizon
+  name: os-horizon
+  namespace: os-horizon
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 443
+    name: https
+  selector:
+    openstack-app: horizon

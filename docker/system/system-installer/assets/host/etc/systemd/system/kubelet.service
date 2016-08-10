@@ -1,0 +1,16 @@
+[Unit]
+Description=Kubernetes Kubelet Service
+Documentation=https://docs.docker.com
+After=network-online.target cloud-init.service chronyd.service docker.service
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+ExecStartPre=/usr/local/bin/kubelet-daemon-start
+ExecStart=/usr/local/bin/kubelet-daemon-monitor
+ExecStop=/usr/local/bin/kubelet-daemon-stop
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

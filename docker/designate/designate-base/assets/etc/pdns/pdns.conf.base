@@ -1,0 +1,26 @@
+# General Config
+setgid=pdns
+setuid=pdns
+config-dir=/etc/pdns
+socket-dir=/var/run
+guardian=yes
+daemon=yes
+disable-axfr=no
+local-address=0.0.0.0
+local-port=553
+master=no
+slave=yes
+cache-ttl=0
+query-cache-ttl=0
+negquery-cache-ttl=0
+out-of-zone-additional-processing=no
+
+# Launch gmysql backend
+launch=gmysql
+
+# gmysql parameters
+gmysql-host=${MARIADB_SERVICE_HOST}
+gmysql-user=${DESIGNATE_PDNS_DB_USER}
+gmysql-password=${DESIGNATE_PDNS_DB_PASSWORD}
+gmysql-dbname=${DESIGNATE_PDNS_DB_NAME}
+gmysql-dnssec=yes

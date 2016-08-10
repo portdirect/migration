@@ -1,0 +1,25 @@
+[Unit]
+Description=HarborOS: OpenStack: swift Service
+After=docker.service freeipa.service os-swift-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=/var/usrlocal/bin/os-swift-storage-preflight.sh
+
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-swift/kube/os-swift-storage_daemonset.yaml --namespace=os-swift
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-swift/kube/os-swift-storage_secrets.yaml --namespace=os-swift
+
+ExecStartPre=-/usr/local/bin/kubectl create -f /etc/os-swift/kube/os-swift_namespace.yaml
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-swift/kube/os-swift-storage_secrets.yaml --namespace=os-swift
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-swift/kube/os-swift-storage_daemonset.yaml --namespace=os-swift
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-swift/kube/os-swift-storage_daemonset.yaml --namespace=os-swift
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-swift/kube/os-swift-storage_secrets.yaml --namespace=os-swift
+
+[Install]
+WantedBy=multi-user.target

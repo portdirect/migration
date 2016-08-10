@@ -1,0 +1,48 @@
+[Unit]
+Description=Network Bootstrap
+After=network.target docker-bootstrap.service
+Requires=docker-bootstrap.service
+
+[Service]
+StandardOutput=null
+TimeoutStartSec=0
+RemainAfterExit=yes
+Type=simple
+ExecStartPre=-/usr/local/bin/harbor-docker pull docker.io/port/system-network:latest
+
+
+ExecStartPre=-/usr/local/bin/harbor-docker stop harbor-install
+ExecStartPre=-/usr/local/bin/harbor-docker kill harbor-install
+ExecStartPre=-/usr/local/bin/harbor-docker rm -v harbor-install
+ExecStartPre=/usr/local/bin/harbor-docker run \
+              --name harbor-install \
+              --net=host \
+              -v /:/host \
+               docker.io/port/system-network:latest harbor-install
+ExecStartPre=-/usr/local/bin/harbor-docker stop harbor-install
+ExecStartPre=-/usr/local/bin/harbor-docker kill harbor-install
+ExecStartPre=/usr/local/bin/harbor-docker rm -v harbor-install
+
+
+ExecStartPre=-/usr/local/bin/harbor-docker stop net-teardown
+ExecStartPre=-/usr/local/bin/harbor-docker kill net-teardown
+ExecStartPre=-/usr/local/bin/harbor-docker rm -v net-teardown
+ExecStartPre=/usr/local/bin/harbor-docker run \
+              --name net-teardown \
+              --net=host \
+              --privileged \
+              --cap-add NET_ADMIN \
+              -v /dev/net:/dev/net \
+              -v /:/host \
+               docker.io/port/system-network:latest net-teardown
+ExecStartPre=-/usr/local/bin/harbor-docker stop net-teardown
+ExecStartPre=-/usr/local/bin/harbor-docker kill net-teardown
+ExecStartPre=/usr/local/bin/harbor-docker rm -v net-teardown
+
+ExecStart=/usr/local/bin/harbor-network-host-prep
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

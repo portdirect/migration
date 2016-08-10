@@ -1,0 +1,25 @@
+[Unit]
+Description=HarborOS: PXE
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+
+ExecStartPre=-/bin/docker-compose -f /etc/pxe/pxe.yaml stop
+ExecStartPre=-/bin/docker-compose -f /etc/pxe/pxe.yaml rm -f -v
+ExecStartPre=-/bin/docker-compose -f /etc/pxe/pxe.yaml pull
+ExecStartPre=-/bin/bash -c 'echo n | ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa'
+
+ExecStartPre=/var/usrlocal/bin/pxe-flight.sh
+ExecStart=/bin/docker-compose -f /etc/pxe/pxe.yaml logs
+
+
+ExecStop=/bin/docker-compose -f /etc/pxe/pxe.yaml stop
+ExecStop=-/bin/docker-compose -f /etc/pxe/pxe.yaml rm -f -v
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

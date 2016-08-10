@@ -1,0 +1,26 @@
+docker run \
+    --net=host \
+    --privileged=true \
+    --pid=host \
+    -v /dev:/dev \
+    -v /var/lib/docker/:/var/lib/docker:rw \
+    -v /var/run/docker.sock:/var/run/docker.sock:rw \
+    -it --rm \
+    --name kubelet \
+    ${DOCKER_KUBE_IMAGE} /hyperkube kubelet \
+        --api-servers=http://10.140.0.1:8080 \
+        --docker-endpoint="unix:///var/run/docker.sock" \
+        --v=4 \
+        --address=${KUBE_IP} \
+        --enable-server \
+        --hostname-override=${KUBE_IP} \
+        --cluster-dns=10.140.0.1 \
+        --cluster-domain=skydns.local
+
+docker run \
+    --name kube-proxy \
+    -d \
+    --net=host \
+    --privileged \
+    ${DOCKER_KUBE_IMAGE} \
+    /hyperkube proxy --master=http://10.140.0.1:8080 --v=4

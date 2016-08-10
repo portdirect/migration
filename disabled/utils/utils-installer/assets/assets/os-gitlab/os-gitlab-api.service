@@ -1,0 +1,29 @@
+[Unit]
+Description=HarborOS: OpenStack: gitlab Service
+After=docker.service freeipa.service os-gitlab-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=/var/usrlocal/bin/os-gitlab-api-preflight.sh
+
+ExecStartPre=-/bin/kubectl delete -f /etc/os-gitlab/kube/os-gitlab-api_service.yaml --namespace=os-gitlab
+ExecStartPre=-/bin/kubectl delete -f /etc/os-gitlab/kube/os-gitlab-api_replicationcontroller.yaml --namespace=os-gitlab
+ExecStartPre=-/bin/kubectl delete -f /etc/os-gitlab/kube/os-gitlab_secrets.yaml --namespace=os-gitlab
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/bin/kubectl create -f /etc/os-gitlab/kube/os-gitlab_secrets.yaml --namespace=os-gitlab
+ExecStartPre=/bin/kubectl create -f /etc/os-gitlab/kube/os-gitlab-api_replicationcontroller.yaml --namespace=os-gitlab
+ExecStart=/bin/kubectl create -f /etc/os-gitlab/kube/os-gitlab-api_service.yaml --namespace=os-gitlab
+
+ExecStop=-/bin/kubectl delete -f /etc/os-gitlab/kube/os-gitlab-api_service.yaml --namespace=os-gitlab
+ExecStop=-/bin/kubectl delete -f /etc/os-gitlab/kube/os-gitlab-api_replicationcontroller.yaml --namespace=os-gitlab
+ExecStop=-/bin/kubectl delete -f /etc/os-gitlab/kube/os-gitlab_secrets.yaml --namespace=os-gitlab
+
+[Install]
+WantedBy=multi-user.target

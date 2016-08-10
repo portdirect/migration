@@ -1,0 +1,24 @@
+<%#
+kind: ptable
+name: Kickstart default
+oses:
+- CentOS 5
+- CentOS 6
+- CentOS 7
+- Fedora 16
+- Fedora 17
+- Fedora 18
+- Fedora 19
+- Fedora 20
+- RedHat 5
+- RedHat 6
+- RedHat 7
+%>
+zerombr
+
+part /boot --fstype=ext4 --asprimary --size=512 --ondrive=sda
+part pv.01 --fstype=xfs --asprimary --grow --ondrive=sda
+volgroup harbor pv.01
+logvol swap --vgname=harbor --fstype=swap --name=swap --recommended
+logvol / --vgname=harbor --fstype=xfs --name=root --grow --percent=95
+clearpart --all --initlabel --drives=sda

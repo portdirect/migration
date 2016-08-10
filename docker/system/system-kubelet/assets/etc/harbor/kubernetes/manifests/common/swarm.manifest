@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: swarm
+    version: v0.1.0
+  name: swarm
+  namespace: node-swarm
+spec:
+  hostNetwork: true
+  containers:
+  - name: swarm
+    image: docker.io/port/system-swarm:latest
+    command:
+      - /swarm
+      - join
+      - --advertise={{NODE_PUBLIC_IP}}:2375
+      - etcd://{{ETCD_SERVICE_HOST}}:4001

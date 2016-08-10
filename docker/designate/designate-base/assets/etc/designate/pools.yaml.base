@@ -1,0 +1,24 @@
+- name: default
+  description: Harbor PowerDNS Pool
+  attributes: {}
+
+  ns_records:
+    - hostname: ns1.${OS_DOMAIN}.
+      priority: 1
+
+  nameservers:
+    - host: ${DESIGNATE_DNS_SERVICE_HOST}
+      port: 53
+
+  targets:
+    - type: powerdns
+      description: PowerDNS Database Cluster
+
+      masters:
+        - host: ${DESIGNATE_MDNS_SERVICE_HOST}
+          port: 5354
+
+      options:
+        host: ${DESIGNATE_DNS_SERVICE_HOST}
+        port: 53
+        connection: mysql://${DESIGNATE_PDNS_DB_USER}:${DESIGNATE_PDNS_DB_PASSWORD}@${MARIADB_SERVICE_HOST}/${DESIGNATE_PDNS_DB_NAME}?charset=utf8

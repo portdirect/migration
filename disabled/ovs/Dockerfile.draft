@@ -1,0 +1,28 @@
+FROM docker.io/ubuntu:16.04
+MAINTAINER Pete Birley <petebirley@gmail.com>
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        supervisor \
+        openvswitch-switch \
+        openvswitch-common \
+        openvswitch-vtep \
+        openvswitch-ipsec \
+        ovn-central \
+        ovn-host \
+        ovn-docker \
+        python-flask && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    mkdir -p /var/run/openvswitch
+
+RUN ovsdb-tool create /etc/openvswitch/conf.db
+
+ADD supervisord.conf /etc/
+ADD configure.sh /bin/ovs-config.sh
+RUN chmod +x /bin/ovs-config.sh
+
+CMD ["/usr/bin/supervisord"]
+
+#RUN ovsdb-tool create /etc/openvswitch/conf.db vswitchd/vswitch.ovsschema
+#FROM docker.io/socketplane/openvswitch:latest

@@ -1,0 +1,44 @@
+#!/bin/bash
+set -e
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: Config"
+echo "-------------------------------------------------------------------------"
+: ${NEUTRON_FLAT_NETWORK_INTERFACE:="br-br1"}
+: ${NEUTRON_FLAT_NETWORK_NAME:="physnet1"}
+
+echo "${OS_DISTRO}: Neutron Device: ${NEUTRON_FLAT_NETWORK_INTERFACE}"
+echo "-------------------------------------------------------------------------"
+ROUTER_ADDR="100.64.0.1/16"
+echo "${OS_DISTRO}: Router Address: ${ROUTER_ADDR}"
+echo "-------------------------------------------------------------------------"
+
+
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: Creating external bridge"
+echo "-------------------------------------------------------------------------"
+ovs-vsctl --may-exist add-br ${NEUTRON_FLAT_NETWORK_INTERFACE}
+
+
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: Launching Docker Container"
+echo "-------------------------------------------------------------------------"
+docker stop neutron-router || true
+docker rm -v neutron-router || true
+ROUTER_CONTAINER=$(docker run --name='neutron-router' -d --cap-add='NET_ADMIN' docker.io/port/neutron-router /start.sh )
+ROUTER_CONTAINER_IP=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' ${ROUTER_CONTAINER})
+
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: Adding interface to docker container"
+echo "-------------------------------------------------------------------------"
+pipework ${NEUTRON_FLAT_NETWORK_INTERFACE} -i eth1 -l ${NEUTRON_FLAT_NETWORK_NAME} ${ROUTER_CONTAINER} ${ROUTER_ADDR}
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: Setting Up host routing to public ip range via ${ROUTER_CONTAINER_IP}"
+echo "-------------------------------------------------------------------------"
+while read -r IP;do
+    ip route del $IP || true
+done <<< $(ip route | grep 100.64.0.0/16)
+ip route add 100.64.0.0/16 via ${ROUTER_CONTAINER_IP}
+echo "-------------------------------------------------------------------------"
+echo "${OS_DISTRO}: Monitoring Logs for ${ROUTER_CONTAINER}"
+echo "-------------------------------------------------------------------------"
+docker logs -f ${ROUTER_CONTAINER}

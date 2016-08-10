@@ -1,0 +1,18 @@
+[Unit]
+Description=FreeIPA Server
+After=docker.service
+Requires=docker.service
+
+[Service]
+StandardOutput=null
+TimeoutStartSec=0
+
+ExecStartPre=-/usr/bin/docker stop freeipa-master
+ExecStartPre=-/usr/bin/docker kill freeipa-master
+ExecStartPre=-/usr/bin/docker rm -v freeipa-master
+ExecStart=/usr/local/bin/freeipa-master
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

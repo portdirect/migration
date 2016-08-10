@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: undercloud-keystone
+    version: v0.1.0
+  name: undercloud-keystone
+  namespace: node-keystone
+spec:
+  hostNetwork: true
+  containers:
+  - name: undercloud-keystone-admin
+    image: docker.io/port/undercloud-keystone:latest
+    ports:
+      - containerPort: 35357
+        hostPort: 35357
+        name: k-admin
+    env:
+      - name: EXPOSED_IP
+        value: {{EXPOSED_IP}}
+      - name: MARIADB_SERVICE_HOST
+        value: {{MARIADB_SERVICE_HOST}}
+      - name: RABBITMQ_SERVICE_HOST
+        value: {{RABBITMQ_SERVICE_HOST}}
+      - name: MEMCACHED_SERVICE_HOST
+        value: {{MEMCACHED_SERVICE_HOST}}
+      - name: KEYSTONE_SERVICE_HOST
+        value: {{KEYSTONE_SERVICE_HOST}}
+      - name: DB_ROOT_PASSWORD
+        value: password
+      - name: KEYSTONE_ADMIN_PASSWORD
+        value: password
+    command:
+      - /start-admin.sh
+  - name: undercloud-keystone-public
+    image: docker.io/port/undercloud-keystone:latest
+    ports:
+      - containerPort: 5000
+        hostPort: 5000
+        name: k-public
+    env:
+      - name: EXPOSED_IP
+        value: {{EXPOSED_IP}}
+      - name: MARIADB_SERVICE_HOST
+        value: {{MARIADB_SERVICE_HOST}}
+      - name: RABBITMQ_SERVICE_HOST
+        value: {{RABBITMQ_SERVICE_HOST}}
+      - name: MEMCACHED_SERVICE_HOST
+        value: {{MEMCACHED_SERVICE_HOST}}
+      - name: KEYSTONE_SERVICE_HOST
+        value: {{KEYSTONE_SERVICE_HOST}}
+      - name: DB_ROOT_PASSWORD
+        value: password
+      - name: KEYSTONE_ADMIN_PASSWORD
+        value: password
+    command:
+      - /start-public.sh

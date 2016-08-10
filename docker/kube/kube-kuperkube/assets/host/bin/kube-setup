@@ -1,0 +1,95 @@
+#!/bin/bash
+source /etc/kube/kube.env
+
+
+KUBE_PORT=8080
+
+
+
+KUBE_SKYDNS_IP=10.112.0.4
+KUBE_DNS_IP=10.112.0.2
+
+
+OS_DOMAIN="$(hostname -d)"
+KUBE_MASTER_HOST="kubernetes.${OS_DOMAIN}"
+KUBEMASTER_URL="https://${KUBE_MASTER_HOST}"
+
+
+
+
+COMPONENT=kube-system
+harbor-docker cp kubelet:/etc/kube/addons/${COMPONENT}.yaml /tmp/
+kubectl create -f /tmp/${COMPONENT}.yaml
+rm -rf /tmp/${COMPONENT}.yaml
+
+COMPONENT=dns
+harbor-docker cp kubelet:/etc/kube/addons/${COMPONENT}.yaml /tmp/
+sed -i "s/{{OS_DOMAIN}}/${OS_DOMAIN}/" /tmp/${COMPONENT}.yaml
+sed -i "s,{{KUBEMASTER_URL}},${KUBEMASTER_URL}," /tmp/${COMPONENT}.yaml
+sed -i "s/{{KUBE_SKYDNS_IP}}/${KUBE_SKYDNS_IP}/" /tmp/${COMPONENT}.yaml
+sed -i "s/{{KUBE_DNS_IP}}/${KUBE_DNS_IP}/" /tmp/${COMPONENT}.yaml
+kubectl delete -f /tmp/${COMPONENT}.yaml
+kubectl create -f /tmp/${COMPONENT}.yaml
+rm -rf /tmp/${COMPONENT}.yaml
+
+
+
+
+
+
+ETCD_DEV:="br0"
+KUBE_DEV:="br0"
+ARCH:="x86"
+KUBE_API_IP=$(ip -f inet -o addr show $KUBE_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+ETCD_URL=http://${ETCD_IP}:4001
+KUBE_URL=http://${KUBE_API_IP}:${KUBE_PORT}
+
+
+label_node_arch () {
+  KUBE_NODES=$(kubectl get nodes --no-headers| awk -F ' ' '{print $1}')
+  for KUBE_NODE in $KUBE_NODES
+  do
+    kubectl label --overwrite node $KUBE_NODE arch=${ARCH}
+  done
+}
+label_node_arch
+
+
+
+COMPONENT=cockpit-ns
+harbor-docker cp kubelet:/etc/kube/harbor/${COMPONENT}.yaml /tmp/
+kubectl create -f /tmp/${COMPONENT}.yaml
+rm -rf /tmp/${COMPONENT}.yaml
+
+COMPONENT=cockpit
+harbor-docker cp kubelet:/etc/kube/harbor/${COMPONENT}.yaml /tmp/
+kubectl delete -f /tmp/${COMPONENT}.yaml
+kubectl create -f /tmp/${COMPONENT}.yaml
+rm -rf /tmp/${COMPONENT}.yaml
+kubectl label --overwrite node $(hostname --fqdn) cockpit=true
+
+
+COMPONENT=freeipa-ns
+harbor-docker cp kubelet:/etc/kube/harbor/${COMPONENT}.yaml /tmp/
+kubectl create -f /tmp/${COMPONENT}.yaml
+rm -rf /tmp/${COMPONENT}.yaml
+
+COMPONENT=freeipa-services
+harbor-docker cp kubelet:/etc/kube/harbor/${COMPONENT}.yaml /tmp/
+sed -i "s,{{CLUSTER_MASTER_IPA_IP}},${KUBE_DNS_IP}," /tmp/${COMPONENT}.yaml
+kubectl create -f /tmp/${COMPONENT}.yaml
+rm -rf /tmp/${COMPONENT}.yaml
+
+COMPONENT=freeipa-master
+harbor-docker cp kubelet:/etc/kube/harbor/${COMPONENT}.yaml /tmp/
+sed -i "s,{{DS_PASSWORD}},$( printf DS_PASSWORD=${DS_PASSWORD} | base64 --wrap=0 )," /tmp/${COMPONENT}.yaml
+sed -i "s,{{ADMIN_PASSWORD}},$( printf ADMIN_PASSWORD=${ADMIN_PASSWORD} | base64 --wrap=0 )," /tmp/${COMPONENT}.yaml
+sed -i "s,{{OS_DOMAIN}},${OS_DOMAIN}," /tmp/${COMPONENT}.yaml
+kubectl create -f /tmp/${COMPONENT}.yaml
+rm -rf /tmp/${COMPONENT}.yaml
+kubectl label --overwrite node $(hostname --fqdn) freeipa=master
+kubectl get events --watch --namespace=harbor-freeipa
+
+
+etcdctl set /node-skydns/config "{\"dns_addr\":\"0.0.0.0:53\",\"ttl\":3600,\"domain\":\"node.local.\",\"nameservers\":[\"${KUBE_DNS_IP}:53\"]}"
+harbor-docker stop skydns

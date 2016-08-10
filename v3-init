@@ -1,0 +1,216 @@
+mkdir -p /opt/harbor-install/bin
+cat > /opt/harbor-install/bin/00-docker-boostrap.sh <<EOF
+#!/bin/bash
+set -e
+PATH=\${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+
+ip link set dev docker1 down || true
+brctl delbr docker1 || true
+brctl addbr docker1 || true
+ip addr add \${FLANNEL_WAN_NETWORK} dev docker1 || true
+ip link set dev docker1 mtu 1500 || true
+ip link set dev docker1 up || true
+
+exec /usr/bin/docker-current daemon \\
+        --exec-opt native.cgroupdriver=systemd \\
+        -H unix:///var/run/docker-init-bootstrap.sock \\
+        -p /var/run/docker-init-bootstrap.pid \\
+        --graph=/var/lib/docker-init-bootstrap \\
+        --bridge=docker1 \\
+        --dns="8.8.8.8" \\
+        --mtu=1500 \\
+        --fixed-cidr=10.98.0.0/16 \\
+        --ip=10.98.0.1 \\
+        --userland-proxy=false \\
+        --storage-driver overlay
+EOF
+chmod +x /opt/harbor-install/bin/00-docker-boostrap.sh
+
+
+/usr/local/bin/docker-init-bootstrap &
+
+
+sleep 3s
+
+
+cat > /opt/harbor-install/bin/01-freeipa-boostrap.sh <<EOF
+#!/bin/bash
+set -e
+PATH=\${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+source /etc/harbor/auth.env
+
+IPA_DATA_DIR=/var/lib/harbor/freeipa/master
+mkdir -p \${IPA_DATA_DIR}
+echo "--allow-zone-overlap" > \${IPA_DATA_DIR}/ipa-server-install-options
+echo "--setup-dns" >> \${IPA_DATA_DIR}/ipa-server-install-options
+echo "--forwarder=\${EXTERNAL_DNS_1}" >> \${IPA_DATA_DIR}/ipa-server-install-options
+echo "--forwarder=\${EXTERNAL_DNS_1}" >> \${IPA_DATA_DIR}/ipa-server-install-options
+for BRIDGE_IP in \${CALICO_NETWORK} \${KUBE_SVC_NETWORK} \${FLANNEL_WAN_NETWORK} \${FLANNEL_CORE_NETWORK}; do
+  # do something
+  REVERSE_ZONE=\$(echo \${BRIDGE_IP} | awk -F. '{print \$3"." \$2"."\$1".in-addr.arpa."}')
+  echo "--reverse-zone=\${REVERSE_ZONE}" >> \${IPA_DATA_DIR}/ipa-server-install-options
+done
+echo "--ds-password=\${IPA_DS_PASSWORD}" >> \${IPA_DATA_DIR}/ipa-server-install-options
+echo "--admin-password=\${IPA_ADMIN_PASSWORD}" >> \${IPA_DATA_DIR}/ipa-server-install-options
+EOF
+chmod +x /opt/harbor-install/bin/01-freeipa-boostrap.sh
+
+
+
+
+cat > /opt/harbor-install/bin/01-freeipa-bootstrap.sh <<EOF
+#!/bin/bash
+set -e
+PATH=\${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+
+IPA_DATA_DIR=/var/lib/harbor/freeipa/master
+docker -H unix:///var/run/docker-init-bootstrap.sock stop freeipa-master || true
+docker -H unix:///var/run/docker-init-bootstrap.sock kill freeipa-master || true
+docker -H unix:///var/run/docker-init-bootstrap.sock rm -v freeipa-master || true
+docker -H unix:///var/run/docker-init-bootstrap.sock run -t \\
+    --hostname=freeipa-master.harboros.net \\
+    --name=freeipa-master \\
+    -v \${IPA_DATA_DIR}:/data:rw \\
+    -v /sys/fs/cgroup:/sys/fs/cgroup:ro \\
+    --dns=8.8.8.8 \\
+    -e OS_DOMAIN=harboros.net \\
+    docker.io/port/ipa-server:latest exit-on-finished
+EOF
+chmod +x /opt/harbor-install/bin/01-freeipa-bootstrap.sh
+
+
+
+
+cat > /opt/harbor-install/bin/03-freeipa-bootup.sh <<EOF
+#!/bin/bash
+set -e
+PATH=\${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+
+IPA_DATA_DIR=/var/lib/harbor/freeipa/master
+docker -H unix:///var/run/docker-init-bootstrap.sock stop freeipa-master || true
+docker -H unix:///var/run/docker-init-bootstrap.sock kill freeipa-master || true
+docker -H unix:///var/run/docker-init-bootstrap.sock rm -v freeipa-master || true
+docker -H unix:///var/run/docker-init-bootstrap.sock run -t -d \\
+  --hostname=freeipa-master.\${OS_DOMAIN} \\
+  --name=freeipa-master \\
+  -v \${IPA_DATA_DIR}:/data:rw \\
+  -v /sys/fs/cgroup:/sys/fs/cgroup:ro \\
+  --dns=8.8.8.8 \\
+  -e OS_DOMAIN=harboros.net \\
+  docker.io/port/ipa-server:latest
+
+FREEIPA_CMD="docker -H unix:///var/run/docker-init-bootstrap.sock exec freeipa-master"
+
+FREEIPA_MASTER_IP=\$(docker -H unix:///var/run/docker-init-bootstrap.sock inspect --format '{{ .NetworkSettings.IPAddress }}' freeipa-master)
+
+until dig freeipa-master.\${OS_DOMAIN} @\${FREEIPA_MASTER_IP}
+do
+  echo "Waiting for FreeIPA DNS to respond"
+  sleep 2
+done
+
+cat /etc/resolv.conf > /etc/resolv-orig.conf
+echo "nameserver \${FREEIPA_MASTER_IP}" > /etc/resolv.conf
+ping -c 1 freeipa-master.\${OS_DOMAIN}
+EOF
+chmod +x /opt/harbor-install/bin/03-freeipa-bootup.sh
+
+
+
+
+cat > /opt/harbor-install/bin/04-freeipa-host-enroll.sh <<EOF
+#!/bin/bash
+set -e
+PATH=\${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+source /etc/harbor/auth.env
+
+systemctl enable certmonger
+systemctl restart certmonger
+
+ipa-client-install \\
+   --hostname=\$(hostname -s).\${OS_DOMAIN} \\
+   --enable-dns-updates \\
+   --request-cert \\
+   --no-ntp \\
+   --force-join \\
+   --unattended \\
+   --principal="\${IPA_ADMIN_USER}" \\
+   --password="\${IPA_ADMIN_PASSWORD}"
+
+sleep 20s
+systemctl enable certmonger
+systemctl restart certmonger
+sleep 60s
+
+SVC_AUTH_ROOT_HOST=/etc/harbor/auth
+SVC_HOST_NAME=\$(hostname -s)
+mkdir -p \${SVC_AUTH_ROOT_HOST}/\${SVC_HOST_NAME}
+HOST_SVC_KEY_LOC=\${SVC_AUTH_ROOT_HOST}/\${SVC_HOST_NAME}/\${SVC_HOST_NAME}.key
+HOST_SVC_CRT_LOC=\${SVC_AUTH_ROOT_HOST}/\${SVC_HOST_NAME}/\${SVC_HOST_NAME}.crt
+HOST_SVC_CA_LOC=\${SVC_AUTH_ROOT_HOST}/\${SVC_HOST_NAME}/ca.crt
+
+
+until certutil -K -d /etc/ipa/nssdb -a -f /etc/ipa/nssdb/pwdfile.txt; do
+   echo "Waiting for Certs"
+   sleep 5
+done
+
+
+until pk12util -o /tmp/keys.p12 -n 'Local IPA host' -d /etc/ipa/nssdb -w /etc/ipa/nssdb/pwdfile.txt -k /etc/ipa/nssdb/pwdfile.txt; do
+   echo "Waiting for Certs"
+   sleep 5
+done
+
+openssl pkcs12 -in /tmp/keys.p12 -out \${HOST_SVC_KEY_LOC} -nocerts -nodes -passin file:/etc/ipa/nssdb/pwdfile.txt -passout pass:
+openssl pkcs12 -in /tmp/keys.p12 -out \${HOST_SVC_CRT_LOC} -clcerts -passin file:/etc/ipa/nssdb/pwdfile.txt -passout pass:
+openssl pkcs12 -in /tmp/keys.p12 -out \${HOST_SVC_CA_LOC} -cacerts -passin file:/etc/ipa/nssdb/pwdfile.txt -passout pass:
+rm -rf /tmp/keys.p12
+
+
+mkdir -p \${SVC_AUTH_ROOT_HOST}/host
+cat \${HOST_SVC_KEY_LOC} > \${SVC_AUTH_ROOT_HOST}/host/host.key
+cat \${HOST_SVC_CRT_LOC} > \${SVC_AUTH_ROOT_HOST}/host/host.crt
+cat \${HOST_SVC_CA_LOC} > \${SVC_AUTH_ROOT_HOST}/host/ca.crt
+EOF
+
+chmod +x /opt/harbor-install/bin/04-freeipa-host-enroll.sh
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+docker -H unix:///var/run/docker-init-bootstrap.sock stop freeipa-master || true
+docker -H unix:///var/run/docker-init-bootstrap.sock kill freeipa-master || true
+docker -H unix:///var/run/docker-init-bootstrap.sock rm -v freeipa-master || true
+
+
+kill \$(cat /var/run/docker-init-bootstrap.pid)
+
+EOF
+chmod +x  /usr/local/bin/docker-init-bootstrap
+
+cat  /usr/local/bin/docker-init-bootstrap

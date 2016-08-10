@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+  labels:
+    app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+spec:
+  type: NodePort
+  ports:
+  - port: 5000
+    nodePort: 5000
+    name: {{OPENSTACK_COMPONENT}}-public
+    protocol: TCP
+  selector:
+    app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-admin
+  labels:
+    app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-admin
+spec:
+  ports:
+  - port: 35357
+    name: {{OPENSTACK_COMPONENT}}-admin
+    protocol: TCP
+  selector:
+    app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{OPENSTACK_COMPONENT}}-default
+  labels:
+    app: {{OPENSTACK_COMPONENT}}-default
+spec:
+  ports:
+  - port: 5000
+    name: {{OPENSTACK_COMPONENT}}-public
+    protocol: TCP
+  - port: 35357
+    name: {{OPENSTACK_COMPONENT}}-admin
+    protocol: TCP
+  selector:
+    app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-default-rc

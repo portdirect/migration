@@ -1,0 +1,75 @@
+.login {
+    margin-top: inherit;
+}
+.login-pf #brand {
+  font-size: 36px;
+  text-transform: uppercase;
+  line-height: 0px;
+}
+.login-pf .submit {
+    padding-top: 18px;
+}
+.login-pf svg {
+  fill: #FFF;
+  width: 80%;
+  opacity: 0.05;
+  left: 10%;
+  top: 20%;
+  max-height: 20%;
+  position: fixed;
+}
+.login-pf .status {
+  margin-top: 2em;
+}
+// General Layout Changes
+#sidebar {
+}
+
+#content_body {
+}
+
+
+#main_content {
+  height: inherit;
+  display: table;
+  min-width: inherit;
+  width: calc(100% - 250px);
+  &.collapsed-nav {
+    width: calc(100% - 75px); // adjust space for the collapsed left nav
+  }
+  &.hidden-nav {
+    width: 100%; // remove space as left nav is hidden
+  }
+}
+
+// Border radius is unattractive here
+
+.navbar-brand {
+  svg {
+    fill: #FFF;
+  }
+}
+
+a.navbar-brand {
+    line-height: 0px !important;
+}
+
+.navbar-brand-name {
+    line-height: 35px;
+    text-transform: uppercase;
+    font-size: 20px;
+    font-weight: 600;
+}
+.layout-pf-alt-fixed .nav-pf-vertical-alt.hidden.show-mobile-nav {
+    visibility: visible !important;
+}
+
+// Add a border to the default table wrapper
+.table_wrapper {
+    border: 1px solid #d1d1d1;
+}
+
+
+#browser_wrapper {
+    min-width: 100%;
+}

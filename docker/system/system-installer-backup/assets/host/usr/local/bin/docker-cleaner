@@ -1,0 +1,11 @@
+#!/bin/bash
+for DOCKER in docker harbor-docker harbor-docker-ovs ipa-docker ; do
+  STOPPED_CONTAINERS="$($DOCKER ps -f status=exited -a -q | head -1)"
+  if [ "$STOPPED_CONTAINERS" != "" ]; then
+    $DOCKER rm -v $($DOCKER ps -f status=exited -a -q)
+  fi
+  DANGLING_IMAGES="$($DOCKER images -q -f dangling=true)"
+  if [ "$DANGLING_IMAGES" != "" ]; then
+    $DOCKER rmi $($DOCKER images -q -f dangling=true)
+  fi
+done

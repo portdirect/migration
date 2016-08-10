@@ -1,0 +1,34 @@
+[Unit]
+Description=HarborOS: OpenStack: glusterfss Service
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+
+ExecStartPre=/var/usrlocal/bin/os-glusterfs-preflight.sh
+
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-glusterfs
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-glusterfs
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_daemonset.yaml --namespace=os-glusterfs
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_secrets.yaml --namespace=os-glusterfs
+
+
+ExecStartPre=-/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_namespace.yaml
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_secrets.yaml --namespace=os-glusterfs
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_daemonset.yaml --namespace=os-glusterfs
+
+ExecStartPre=-/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-glusterfs
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-glusterfs
+
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-glusterfs
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-glusterfs
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_daemonset.yaml --namespace=os-glusterfs
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_secrets.yaml --namespace=os-glusterfs
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

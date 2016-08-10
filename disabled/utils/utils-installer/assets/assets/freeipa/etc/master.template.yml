@@ -1,0 +1,11 @@
+server:
+  image: {{OS_REGISTRY}}/{{OS_DISTRO}}/ipa-server:{{OS_RELEASE}}
+  hostname: {{IPA_MASTER_HOSTNAME}}.{{OS_DOMAIN}}
+  dns:
+   - {{IPA_UPSTREAM_DNS}}
+  ports:
+   - "10.0.1.33:443:443/tcp"
+  volumes:
+   - {{IPA_DATA_DIR}}:/data:Z
+  environment:
+   - "constraint:node=={{IPA_MASTER_NODE}}"

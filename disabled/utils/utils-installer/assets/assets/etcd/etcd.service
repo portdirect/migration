@@ -1,0 +1,23 @@
+[Unit]
+Description=Etcd Server
+After=network.target etcd-manager.service docker-bootstrap.service
+Requires=etcd-manager.service docker-bootstrap.service
+
+[Service]
+Type=simple
+# etcd logs to the journal directly, suppress double logging
+StandardOutput=null
+WorkingDirectory=/var/lib/etcd/
+EnvironmentFile=-/etc/etcd/etcd.conf
+TimeoutStartSec=0
+RemainAfterExit=yes
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock stop etcd
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock kill etcd
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock rm etcd
+ExecStart=/var/usrlocal/bin/etcd-daemon.sh
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

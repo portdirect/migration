@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: etcd-kube
+    version: v0.1.0
+  namespace: kube-system
+  name: etcd-kube
+spec:
+  hostNetwork: true
+  containers:
+  - name: etcd-kube
+    image: docker.io/port/system-etcd:latest
+    ports:
+    - containerPort: 4002
+      hostPort: 4002
+      name: etcd
+    - containerPort: 7002
+      hostPort: 7002
+      name: peers
+    command:
+    - etcd
+    - --name=master
+    - --data-dir=/var/etcd
+    - --listen-client-urls=https://0.0.0.0:4002
+    - --listen-peer-urls=https://0.0.0.0:7002
+    - --advertise-client-urls=https://etcd-kube.{{OS_DOMAIN}}:4002
+    - --initial-cluster-token='etcd-cluster'
+    - --ca-file=/etc/os-ssl/ca.crt
+    - --cert-file=/etc/os-ssl/etcd-kube.crt
+    - --key-file=/etc/os-ssl/etcd-kube.key
+    - --peer-ca-file=/etc/os-ssl/ca.crt
+    - --peer-cert-file=/etc/os-ssl/etcd-kube.crt
+    - --peer-key-file=/etc/os-ssl/etcd-kube.key
+    volumeMounts:
+      - mountPath: /etc/os-ssl
+        name: os-ssl
+      - mountPath: /var/etcd
+        name: etcd-kube
+  volumes:
+    - name: "os-ssl"
+      hostPath:
+        path: "/etc/harbor/auth/etcd-kube"
+    - name: "etcd-kube"
+      hostPath:
+        path: "/var/lib/harbor/etcd/kube"

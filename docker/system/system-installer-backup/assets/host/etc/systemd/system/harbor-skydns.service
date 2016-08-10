@@ -1,0 +1,18 @@
+[Unit]
+Description=Harbor Skydns
+After=docker-bootstrap.service harbor-etcd.service harbor-etcd-master.service
+Requires=docker-bootstrap.service
+
+[Service]
+TimeoutStartSec=0
+Type=simple
+RemainAfterExit=no
+ExecStartPre=/bin/cp -f /etc/resolv.conf /etc/resolv-orig.conf
+ExecStart=/usr/local/bin/harbor-skydns-launch
+ExecStop=-/bin/cp -f /etc/resolv-orig.conf /etc/resolv.conf
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

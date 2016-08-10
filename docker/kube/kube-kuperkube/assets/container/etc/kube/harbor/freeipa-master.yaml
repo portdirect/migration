@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: freeipa-master
+  namespace: harbor-freeipa
+type: Opaque
+data:
+  ds-password: {{DS_PASSWORD}}
+  admin-password: {{ADMIN_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    harbor-app: freeipa-master
+    version: v0.1.0
+  name: freeipa-master
+  namespace: harbor-freeipa
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        harbor-app: freeipa-master
+        version: v0.1.0
+      name: freeipa-master
+      namespace: harbor-freeipa
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: harbor-freeipa
+          image:  docker.io/port/x86-freeipa:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: freeipa-master-secret
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: false
+            - name: kubectl-binary
+              mountPath: "/bin/kubectl"
+              readOnly: false
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+            - name: data
+              mountPath: "/data"
+              readOnly: false
+          command:
+            - /run.sh
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      volumes:
+        - name: freeipa-master-secret
+          secret:
+            secretName: freeipa-master
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker
+        - name: kubectl-binary
+          hostPath:
+            path: /usr/bin/kubectl
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+        - name: data
+          hostPath:
+            path: /var/lib/freeipa-master

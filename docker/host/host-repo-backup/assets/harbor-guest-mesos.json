@@ -1,0 +1,10 @@
+{
+    "include": "harbor-guest.json",
+
+    "ref": "harbor-host/7/x86_64/guest_mesos",
+
+    "repos": ["mesosphere", "mesosphere-noarch", "mesosphere-source"],
+
+    "packages": [ "mesos", "marathon", "mesosphere-zookeeper" ],
+
+}

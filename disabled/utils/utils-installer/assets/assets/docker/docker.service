@@ -1,0 +1,69 @@
+[Unit]
+Description=Docker Application Container Engine
+Documentation=https://docs.docker.com
+After=network.target docker-bootstrap.service
+Requires=docker-bootstrap.service
+
+[Service]
+Type=simple
+TimeoutStartSec=0
+
+# Pull the latest docker network management container
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock pull docker.io/harboros/utils-network:latest
+
+# Remove any previous bootstrap containers
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock stop \
+                docker-register \
+                docker-network \
+                ovs-harbor-bridge-init \
+                ovs-harbor-bridge
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock kill \
+                docker-register \
+                docker-network \
+                ovs-harbor-bridge-init \
+                ovs-harbor-bridge
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock rm -v \
+                docker-register \
+                docker-network \
+                ovs-harbor-bridge-init \
+                ovs-harbor-bridge
+
+# Register the node with etcd
+ExecStartPre=/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock run \
+                --net=host \
+                --name docker-register \
+                -v /var/run/docker-bootstrap.sock:/var/run/docker.sock \
+                docker.io/harboros/utils-network:latest /bin/register
+# Prepare the docker0 network interface
+ExecStartPre=/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock run \
+                --net=host \
+                --name docker-network \
+                -v /var/run/docker-bootstrap.sock:/var/run/docker.sock \
+                docker.io/harboros/utils-network:latest /bin/prep-docker
+# Run an initial update of the docker0_ovs interface
+ExecStartPre=/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock run \
+                --net=host \
+                --name ovs-harbor-bridge-init \
+                -v /var/run/docker-bootstrap.sock:/var/run/docker.sock \
+                docker.io/harboros/utils-network:latest /bin/update-ovs
+# Watch etcd for changes, and run the update-ovs script
+ExecStartPre=/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock run \
+                -d \
+                --restart=always \
+                --net=host \
+                --name ovs-harbor-bridge \
+                -v /var/run/docker-bootstrap.sock:/var/run/docker.sock \
+                docker.io/harboros/utils-network:latest /bin/etcd-monitor
+# Launch the primary docker daemon
+ExecStart=/var/usrlocal/bin/docker-daemon.sh
+
+MountFlags=slave
+LimitNOFILE=1048576
+LimitNPROC=1048576
+LimitCORE=infinity
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

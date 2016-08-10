@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+KUBECTL=/usr/local/bin/kubectl-bin
+if [ -x $KUBECTL ]; then
+  exec $KUBECTL $@
+else
+  ln -s /usr/bin/kubectl $KUBECTL
+  exec $KUBECTL $@
+fi
+echo "Harbor could not run your command"

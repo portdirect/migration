@@ -1,0 +1,4 @@
+[Harbor]
+name=Harbor
+baseurl=http://rpmostree.harboros.net:8015/repo/atomic-host/7/x86_64/
+gpgcheck=0

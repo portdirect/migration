@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    harbor-app: openvirtualnetwork-node
+    version: v0.1.0
+  name: ovn-node
+  namespace: node-ovn
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 6640
+    targetPort: 6640
+    protocol: TCP
+    name: ovsdb
+  selector:
+    harbor-app: openvirtualnetwork-node

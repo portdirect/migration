@@ -1,0 +1,7 @@
+#!/bin/sh
+#exec harbor-docker exec etcd ${0##*/} "${@}"
+exec harbor-docker exec etcd  ${0##*/} --cert-file /etc/harbor/auth/host/host.crt \
+                                       --key-file /etc/harbor/auth/host/host.key \
+                                       --ca-file /etc/harbor/auth/host/ca.crt \
+                                       --peers https://$(hostname -f):4001 \
+                                       "${@}"

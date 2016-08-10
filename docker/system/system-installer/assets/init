@@ -1,0 +1,16 @@
+#!/bin/sh
+: ${HOST_ROOT:='/host'}
+
+install_assets () {
+  echo "Installing: HarborOS"
+  /bin/cp -rf /opt/host/etc/* ${HOST_ROOT}/etc/
+  mkdir -p ${HOST_ROOT}/usr/local/bin
+  /bin/cp -rf /opt/host/usr/local/bin/* ${HOST_ROOT}/usr/local/bin/
+  if [ -f ${HOST_ROOT}/etc/master-node ]; then
+    mkdir -p ${HOST_ROOT}/opt/harbor-install
+    /bin/cp -rf /opt/host/opt/harbor-install/* ${HOST_ROOT}/opt/harbor-install/
+  fi
+  echo "Finished Installation"
+}
+
+install_assets

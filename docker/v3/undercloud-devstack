@@ -1,0 +1,279 @@
+sudo apt-get update -y
+sudo apt-get install -y git
+git clone --depth 1 https://git.openstack.org/openstack-dev/devstack
+sudo chown -R $(whoami) /usr/local/lib/python2.7
+sudo mkdir -p /opt/stack
+sudo chown -R $(whoami) /opt/stack
+
+
+
+
+
+
+cd devstack
+cat > local.conf <<EOF
+[[local|localrc]]
+ADMIN_PASSWORD=supersecret
+DATABASE_PASSWORD=iheartdatabases
+RABBIT_PASSWORD=flopsymopsy
+SERVICE_PASSWORD=iheartksl
+
+enable_plugin networking-ovn http://git.openstack.org/openstack/networking-ovn
+enable_service ovn-northd
+enable_service ovn-controller
+
+enable_plugin neutron-lbaas https://git.openstack.org/openstack/neutron-lbaas
+enable_service q-lbaasv2
+#enable_plugin neutron-lbaas-dashboard https://git.openstack.org/openstack/neutron-lbaas-dashboard
+
+NEUTRON_LBAAS_SERVICE_PROVIDERV2="LOADBALANCERV2:Haproxy:neutron_lbaas.drivers.haproxy.plugin_driver.HaproxyOnHostPluginDriver:default"
+
+# Use Neutron instead of nova-network
+disable_service n-net
+enable_service q-svc
+
+# OVN currently uses the conventional DHCP and metadata agents. For
+# single-node deployments, enable them on the controller node. For
+# multi-node deployments, consider disabling them on the controller
+# node and enabling them on the compute node(s) to provide a more
+# realistic environment. For more information, see
+# computenode-local.conf.sample.
+enable_service q-dhcp
+enable_service q-meta
+disable_service q-agt
+
+
+# Whether to enable using OVN's L3 functionality. If this value is disabled,
+# OpenStack will use the q-l3 functionality.  If you set OVN_L3_MODE to False,
+# you must also enable the q-l3 service.
+# By default OVN_L3_MODE is True
+OVN_L3_MODE=False
+enable_service q-l3
+#disable_service q-l3
+
+OVN_BUILD_MODULES=False
+
+# If you enable the DHCP agent, configure it to provide a route for
+# metadata to instances.
+ENABLE_ISOLATED_METADATA=True
+
+# Enable QoS
+#enable_plugin neutron http://git.openstack.org/openstack/neutron
+#enable_service q-qos
+
+# Skydive
+#enable_plugin skydive https://github.com/redhat-cip/skydive.git
+#enable_service skydive-analyzer
+#enable_service skydive-agent
+EOF
+
+./stack.sh
+
+
+
+
+cd devstack
+cat > local.conf <<EOF
+[[local|localrc]]
+ADMIN_PASSWORD=supersecret
+DATABASE_PASSWORD=iheartdatabases
+RABBIT_PASSWORD=flopsymopsy
+SERVICE_PASSWORD=iheartksl
+
+
+# Branches
+NOVA_BRANCH=stable/mitaka
+
+
+enable_plugin neutron-lbaas https://git.openstack.org/openstack/neutron-lbaas
+enable_service q-lbaasv2
+#enable_plugin neutron-lbaas-dashboard https://git.openstack.org/openstack/neutron-lbaas-dashboard
+
+NEUTRON_LBAAS_SERVICE_PROVIDERV2="LOADBALANCERV2:Haproxy:neutron_lbaas.drivers.haproxy.plugin_driver.HaproxyOnHostPluginDriver:default"
+
+# Use Neutron instead of nova-network
+disable_service n-net
+enable_service q-svc
+enable_service q-dhcp
+enable_service q-meta
+enable_service q-agt
+enable_service q-l3
+
+disable_service tempest
+EOF
+
+./stack.sh
+
+cd devstack
+cat > local.conf <<EOF
+[[local|localrc]]
+ADMIN_PASSWORD=supersecret
+DATABASE_PASSWORD=iheartdatabases
+RABBIT_PASSWORD=flopsymopsy
+SERVICE_PASSWORD=iheartksl
+
+enable_plugin networking-ovn http://git.openstack.org/openstack/networking-ovn
+enable_service ovn-northd
+enable_service ovn-controller
+
+enable_plugin neutron-lbaas https://git.openstack.org/openstack/neutron-lbaas
+enable_service q-lbaasv2
+#enable_plugin neutron-lbaas-dashboard https://git.openstack.org/openstack/neutron-lbaas-dashboard
+
+NEUTRON_LBAAS_SERVICE_PROVIDERV2="LOADBALANCERV2:Haproxy:neutron_lbaas.drivers.haproxy.plugin_driver.HaproxyOnHostPluginDriver:default"
+
+# Use Neutron instead of nova-network
+disable_service n-net
+enable_service q-svc
+
+# OVN currently uses the conventional DHCP and metadata agents. For
+# single-node deployments, enable them on the controller node. For
+# multi-node deployments, consider disabling them on the controller
+# node and enabling them on the compute node(s) to provide a more
+# realistic environment. For more information, see
+# computenode-local.conf.sample.
+enable_service q-dhcp
+enable_service q-meta
+
+# We have to disable the neutron L2 agent. OVN does not use the L2 agent.
+disable_service q-agt
+
+# How to connect to ovsdb-server hosting the OVN NB database.
+#OVN_NB_REMOTE=tcp:$SERVICE_HOST:6641
+
+# How to connect to ovsdb-server hosting the OVN SB database.
+#OVN_SB_REMOTE=tcp:$SERVICE_HOST:6642
+
+
+
+# A UUID to uniquely identify this system.  If one is not specified, a random
+# one will be generated and saved in the file 'ovn-uuid' for re-use in future
+# DevStack runs.
+#OVN_UUID=
+
+# Whether to enable using OVN's L3 functionality. If this value is disabled,
+# OpenStack will use the q-l3 functionality.  If you set OVN_L3_MODE to False,
+# you must also enable the q-l3 service.
+# By default OVN_L3_MODE is True
+OVN_L3_MODE=False
+enable_service q-l3
+#disable_service q-l3
+
+# Whether or not to build custom openvswitch kernel modules from the ovs git
+# tree. This is enabled by default.  This is required unless your distro kernel
+# includes ovs+conntrack support.  This support was first released in Linux 4.3,
+# and will likely be backported by some distros.
+#OVN_BUILD_MODULES=False
+
+# If you enable the DHCP agent, configure it to provide a route for
+# metadata to instances.
+ENABLE_ISOLATED_METADATA=True
+
+# Enable QoS
+#enable_plugin neutron http://git.openstack.org/openstack/neutron
+#enable_service q-qos
+
+# Skydive
+#enable_plugin skydive https://github.com/redhat-cip/skydive.git
+#enable_service skydive-analyzer
+#enable_service skydive-agent
+EOF
+
+./stack.sh
+
+
+
+
+
+
+
+
+
+22016-07-25 15:15:48.201 DEBUG oslo_service.periodic_task [-] Running periodic task LbaasAgentManager.collect_stats from (pid=15714) run_periodic_tasks /usr/local/lib/python2.7/dist-packages/oslo_service/periodic_task.py:215
+2016-07-25 15:15:51.552 DEBUG oslo_messaging._drivers.amqpdriver [-] received message with unique_id: e6a7501284cb486bb3c0b3a278ba6983 from (pid=15714) __call__ /usr/local/lib/python2.7/dist-packages/oslo_messaging/_drivers/amqpdriver.py:196
+2016-07-25 15:15:51.553 ERROR oslo_messaging.rpc.server [req-65ddcac6-c83b-4a62-8de9-23a83dcb27ca admin 81ff287747de4e2dbcee70582ee2595f] Exception during message handling
+2016-07-25 15:15:51.553 TRACE oslo_messaging.rpc.server Traceback (most recent call last):
+2016-07-25 15:15:51.553 TRACE oslo_messaging.rpc.server   File "/usr/local/lib/python2.7/dist-packages/oslo_messaging/rpc/server.py", line 133, in _process_incoming
+2016-07-25 15:15:51.553 TRACE oslo_messaging.rpc.server     res = self.dispatcher.dispatch(message)
+2016-07-25 15:15:51.553 TRACE oslo_messaging.rpc.server   File "/usr/local/lib/python2.7/dist-packages/oslo_messaging/rpc/dispatcher.py", line 150, in dispatch
+2016-07-25 15:15:51.553 TRACE oslo_messaging.rpc.server     return self._do_dispatch(endpoint, method, ctxt, args)
+2016-07-25 15:15:51.553 TRACE oslo_messaging.rpc.server   File "/usr/local/lib/python2.7/dist-packages/oslo_messaging/rpc/dispatcher.py", line 121, in _do_dispatch
+2016-07-25 15:15:51.553 TRACE oslo_messaging.rpc.server     result = func(ctxt, **new_args)
+2016-07-25 15:15:51.553 TRACE oslo_messaging.rpc.server   File "/opt/stack/neutron-lbaas/neutron_lbaas/services/loadbalancer/agent/agent_manager.py", line 280, in create_member
+2016-07-25 15:15:51.553 TRACE oslo_messaging.rpc.server     driver = self._get_driver(member['pool_id'])
+2016-07-25 15:15:51.553 TRACE oslo_messaging.rpc.server   File "/opt/stack/neutron-lbaas/neutron_lbaas/services/loadbalancer/agent/agent_manager.py", line 168, in _get_driver
+2016-07-25 15:15:51.553 TRACE oslo_messaging.rpc.server     raise DeviceNotFoundOnAgent(pool_id=pool_id)
+2016-07-25 15:15:51.553 TRACE oslo_messaging.rpc.server DeviceNotFoundOnAgent: Unknown device with pool_id 43b80edf-8eac-4f27-88b3-200756faa384
+2016-07-25 15:15:51.553 TRACE oslo_messaging.rpc.server
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+cd devstack
+cat > local.conf <<EOF
+[[local|localrc]]
+ADMIN_PASSWORD=supersecret
+DATABASE_PASSWORD=iheartdatabases
+RABBIT_PASSWORD=flopsymopsy
+SERVICE_PASSWORD=iheartksl
+
+
+# Branches
+NOVA_BRANCH=stable/mitaka
+
+
+enable_plugin neutron-lbaas https://git.openstack.org/openstack/neutron-lbaas
+enable_service q-lbaasv2
+#enable_plugin neutron-lbaas-dashboard https://git.openstack.org/openstack/neutron-lbaas-dashboard
+
+NEUTRON_LBAAS_SERVICE_PROVIDERV2="LOADBALANCERV2:Haproxy:neutron_lbaas.drivers.haproxy.plugin_driver.HaproxyOnHostPluginDriver:default"
+
+# Use Neutron instead of nova-network
+disable_service n-net
+enable_service q-svc
+enable_service q-dhcp
+enable_service q-meta
+enable_service q-agt
+enable_service q-l3
+
+disable_service tempest
+EOF
+
+./stack.sh
+
+cd devstack
+cat > local.conf <<EOF
+[[local|localrc]]
+ADMIN_PASSWORD=supersecret
+DATABASE_PASSWORD=iheartdatabases
+RABBIT_PASSWORD=flopsymopsy
+SERVICE_PASSWORD=iheartksl
+
+enable_plugin neutron-lbaas https://git.openstack.org/openstack/neutron-lbaas
+enable_service q-lbaasv2
+#enable_plugin neutron-lbaas-dashboard https://git.openstack.org/openstack/neutron-lbaas-dashboard
+
+NEUTRON_LBAAS_SERVICE_PROVIDERV2="LOADBALANCERV2:Haproxy:neutron_lbaas.drivers.haproxy.plugin_driver.HaproxyOnHostPluginDriver:default"
+
+# Use Neutron instead of nova-network
+disable_service n-net
+enable_service q-svc
+enable_service q-agt
+enable_service q-dhcp
+enable_service q-l3
+enable_service q-meta
+EOF
+
+./stack.sh

@@ -1,0 +1,73 @@
+#!/bin/bash
+set -e
+etcdctl rm -recursive /ovs
+# Default settings
+: ${OVS_NETWORK:="10.96.0.0/12"}
+: ${OVS_DEV:="br0"}
+: ${OVS_DOCKER_CIDR:="24"}
+
+
+OVS_CIDR=${OVS_NETWORK#*/}
+OVS_NETWORK_START=${OVS_NETWORK%/*}
+OVS_IP=$(ip -f inet -o addr show $OVS_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+HOSTNAME=$(hostname)
+
+HARBOR_VOLUME=/harbor
+
+
+if (etcdctl ls -recursive /ovs/nodes | grep -q $HOSTNAME ); then
+  echo "Node already registered"
+  EXISTING_IP=$(etcdctl get /ovs/nodes/$HOSTNAME)
+  echo EXISTING_IP=$EXISTING_IP
+  if [ "$EXISTING_IP" != "$OVS_IP" ]; then
+    echo "Node has already been registered, but ther is an IP mismatch, I'm not clever enought to deal with this yet. Exiting"
+    exit 1
+  fi
+  etcdctl ls -recursive /ovs/network/subnets | \
+  while read ETCD_KEY; do
+    SUBNET_KEY=$(etcdctl get ${ETCD_KEY})
+    if [ "${SUBNET_KEY}" == "${OVS_IP}" ]; then
+      OVS_DOCKER_SUBNET=$(echo ${ETCD_KEY#/ovs/network/subnets/} | tr '-' '/')
+      echo "This node has the subnet $OVS_DOCKER_SUBNET"
+      echo "found" > $HARBOR_VOLUME/ovs-subnet
+    fi
+  done
+  if [ "$(cat $HARBOR_VOLUME/ovs-subnet)" != "found" ]; then
+    echo "This nodes IP not found in the list of registered subnets, exiting"
+    exit 1
+  fi
+else
+  echo "Node not registered, doing that now"
+  rm -f $HARBOR_VOLUME/ovs-subnets
+  if etcdctl ls /ovs/network/subnets; then
+    DOCKER_BRIDGE_SUBNET=$(sipcalc -n 2 $OVS_NETWORK_START | tac | grep -m 1 Network | awk '{print $3}')
+    COUNTER=0
+    etcdctl ls /ovs/network/subnets | \
+    while read ETCD_KEY; do
+      OVS_DOCKER_SUBNET=$(echo ${ETCD_KEY#/ovs/network/subnets/} | tr '-' '/')
+      echo "$OVS_DOCKER_SUBNET $(etcdctl get $ETCD_KEY)" >> /tmp/ovs-subnets-unsorted
+    done
+    # Sort the the list of hosts and place it in the shared directory
+    sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 /tmp/ovs-subnets-unsorted > $HARBOR_VOLUME/ovs-subnets
+    # This is fixed to a subnet per machine on the same /12 network for now
+    awk '{print $1}' $HARBOR_VOLUME/ovs-subnets | awk -F '.' '$3!=p+1{print $1"."$2"."p+1"."$4}{p=$3}' | awk '{if(NR>1)print}' > /tmp/ovs-subnets-avalible
+    tail -1 $HARBOR_VOLUME/ovs-subnets | awk '{print $1}' | awk -F '.' '$3!=254{print $1"."$2"."$3+1"."$4}' >> /tmp/ovs-subnets-avalible
+    head -1 /tmp/ovs-subnets-avalible > $HARBOR_VOLUME/ovs-node-subnet
+    DOCKER_BRIDGE_SUBNET=$(head -1 $HARBOR_VOLUME/ovs-node-subnet | awk -F '/' '{print $1}')
+    OVS_DOCKER_CIDR=$(head -1 $HARBOR_VOLUME/ovs-node-subnet | awk -F '/' '{print $2}')
+    if etcdctl get /ovs/network/subnets/${DOCKER_BRIDGE_SUBNET}/${OVS_DOCKER_CIDR}; then
+      echo "Subnet: ${DOCKER_BRIDGE_SUBNET}/${OVS_DOCKER_CIDR} has been allocated to another node"
+      #exit 1
+    else
+      echo "Subnet: ${DOCKER_BRIDGE_SUBNET}/${OVS_DOCKER_CIDR} has been allocated to this node"
+      etcdctl set /ovs/network/subnets/${DOCKER_BRIDGE_SUBNET}-${OVS_DOCKER_CIDR} ${OVS_IP}
+      etcdctl set /ovs/network/nodes/$HOSTNAME ${DOCKER_BRIDGE_SUBNET}/${OVS_DOCKER_CIDR}
+      etcdctl set /ovs/nodes/$HOSTNAME ${OVS_IP}
+    fi
+  else
+    echo "No Other nodes found, this node will be granted the 1st avalible subnet ${OVS_NETWORK_START}/${OVS_DOCKER_CIDR}"
+    etcdctl set /ovs/network/subnets/${OVS_NETWORK_START}-${OVS_DOCKER_CIDR} ${OVS_IP}
+    etcdctl set /ovs/network/nodes/$HOSTNAME ${OVS_NETWORK_START}/${OVS_DOCKER_CIDR}
+    etcdctl set /ovs/nodes/$HOSTNAME ${OVS_IP}
+  fi
+fi

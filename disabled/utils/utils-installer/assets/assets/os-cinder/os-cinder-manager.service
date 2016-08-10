@@ -1,0 +1,36 @@
+[Unit]
+Description=HarborOS: OpenStack: cinder Manager: Service
+After=docker.service freeipa.service os-database.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+EnvironmentFile=/etc/os-common/common.env
+RemainAfterExit=True
+
+
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-cinder
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-cinder
+
+ExecStartPre=-/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-cinder
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-cinder
+ExecStartPre=/var/usrlocal/bin/os-cinder-manager-flight.sh
+
+ExecStart=/bin/echo 'cinder Configured'
+ExecStartPost=/usr/local/bin/etcdctl set /${OS_DISTRO}/cinder/status DOWN
+
+ExecStop=/usr/local/bin/etcdctl set /${OS_DISTRO}/cinder/status DOWN
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-cinder/kube/os-cinder-manager_replicationcontroller.yaml --namespace=os-cinder
+
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-cinder
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-cinder
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=os-cinder-api.service

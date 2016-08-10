@@ -1,0 +1,4 @@
+#!/bin/bash
+
+exit_code=$( cat /run/local-container/exit_code )
+exit $exit_code

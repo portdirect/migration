@@ -1,0 +1,282 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: accounts-manager
+  namespace: os-accounts
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: accounts-manager
+    version: v0.1.0
+  name: accounts-manager
+  namespace: os-accounts
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: accounts-manager
+        version: v0.1.0
+      name: accounts-manager
+      namespace: os-accounts
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: accounts-manager
+          image:  docker.io/port/accounts-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: libdevmapper
+              mountPath: "/lib64/libdevmapper.so.1.02"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: accounts-manager
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: libdevmapper
+          hostPath:
+            path: /lib64/libdevmapper.so.1.02
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: accounts
+  namespace: os-accounts
+type: Opaque
+data:
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  portal-smtp-host: {{PORTAL_SMTP_HOST}}
+  portal-smtp-port: {{PORTAL_SMTP_PORT}}
+  portal-smtp-user: {{PORTAL_SMTP_USER}}
+  portal-smtp-pass: {{PORTAL_SMTP_PASS}}
+  portal-default-from-email: {{PORTAL_DEFAULT_FROM_EMAIL}}
+  portal-default-admin-email: {{PORTAL_DEFAULT_ADMIN_EMAIL}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: accounts
+    version: v0.1.0
+  name: accounts
+  namespace: os-accounts
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: accounts
+        version: v0.1.0
+      name: accounts
+      namespace: os-accounts
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: accounts
+          image: docker.io/port/accounts-portal:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+          - containerPort: 4433
+            name: https
+            protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: accounts
+        - name: os-ssl
+          secret:
+            secretName: accounts-ssl-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: accounts-password
+  namespace: os-accounts
+type: Opaque
+data:
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: accounts-password
+    version: v0.1.0
+  name: accounts-reset
+  namespace: os-accounts
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: accounts-password
+        version: v0.1.0
+      name: accounts-password
+      namespace: os-accounts
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: password
+          image: docker.io/port/accounts-password-reset:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+          - containerPort: 44333
+            name: https
+            protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: os-keytab
+              mountPath: "/etc/os-keytab"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: accounts
+        - name: os-ssl
+          secret:
+            secretName: password-ssl-secret
+        - name: os-keytab
+          secret:
+            secretName: password-keytab-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: accounts-activate
+  namespace: os-accounts
+type: Opaque
+data:
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  portal-smtp-host: {{PORTAL_SMTP_HOST}}
+  portal-smtp-port: {{PORTAL_SMTP_PORT}}
+  portal-smtp-user: {{PORTAL_SMTP_USER}}
+  portal-smtp-pass: {{PORTAL_SMTP_PASS}}
+  portal-default-from-email: {{PORTAL_DEFAULT_FROM_EMAIL}}
+  portal-default-admin-email: {{PORTAL_DEFAULT_ADMIN_EMAIL}}
+  cloudkitty-freeipa-user: {{CLOUDKITTY_FREEIPA_USER}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: accounts-activate
+    version: v0.1.0
+  name: accounts-activate
+  namespace: os-accounts
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: accounts-activate
+        version: v0.1.0
+      name: accounts-activate
+      namespace: os-accounts
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: activate
+          image: docker.io/port/accounts-activate:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: accounts-activate

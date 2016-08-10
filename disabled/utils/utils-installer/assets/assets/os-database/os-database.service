@@ -1,0 +1,44 @@
+[Unit]
+Description=HarborOS: OpenStack: DataBases Service
+After=docker.service freeipa.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+
+ExecStartPre=/var/usrlocal/bin/os-database-preflight.sh
+
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-database/kube/os-database_service.yaml --namespace=os-database
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-database/kube/os-database_daemonset.yaml --namespace=os-database
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-database/kube/os-database_secrets.yaml --namespace=os-database
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-database/kube/os-database_volume_claim.yaml --namespace=os-database
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-database/kube/os-database_volume_definition.yaml --namespace=os-database
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-database
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-database
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=-/usr/local/bin/kubectl create -f /etc/os-database/kube/os-database_namespace.yaml
+#ExecStartPre=-/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-database
+#ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-database
+#ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-database/kube/os-database_volume_definition.yaml --namespace=os-database
+#ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-database/kube/os-database_volume_claim.yaml --namespace=os-database
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-database/kube/os-database_secrets.yaml --namespace=os-database
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-database/kube/os-database_daemonset.yaml --namespace=os-database
+
+ExecStartPost=-/usr/local/bin/kubectl create -f /etc/os-database/kube/os-database_service.yaml --namespace=os-database
+
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-database/kube/os-database_service.yaml --namespace=os-database
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-database/kube/os-database_daemonset.yaml --namespace=os-database
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-database/kube/os-database_secrets.yaml --namespace=os-database
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-database/kube/os-database_volume_claim.yaml --namespace=os-database
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-database/kube/os-database_volume_definition.yaml --namespace=os-database
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-database
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-database
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

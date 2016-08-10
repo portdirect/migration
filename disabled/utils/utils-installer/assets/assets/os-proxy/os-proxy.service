@@ -1,0 +1,44 @@
+[Unit]
+Description=HarborOS: OpenStack: DataBases Service
+After=docker.service freeipa.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+
+ExecStartPre=/var/usrlocal/bin/os-proxy-preflight.sh
+
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-proxy/kube/os-proxy_service.yaml --namespace=os-proxy
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-proxy/kube/os-proxy_daemonset.yaml --namespace=os-proxy
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-proxy/kube/os-proxy_secrets.yaml --namespace=os-proxy
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-proxy/kube/os-proxy_volume_claim.yaml --namespace=os-proxy
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-proxy/kube/os-proxy_volume_definition.yaml --namespace=os-proxy
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-proxy
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-proxy
+
+ExecStartPre=/var/usrlocal/bin/proxy-service-status.sh
+
+ExecStartPre=-/usr/local/bin/kubectl create -f /etc/os-proxy/kube/os-proxy_namespace.yaml
+#ExecStartPre=-/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-proxy
+#ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-proxy
+#ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-proxy/kube/os-proxy_volume_definition.yaml --namespace=os-proxy
+#ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-proxy/kube/os-proxy_volume_claim.yaml --namespace=os-proxy
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-proxy/kube/os-proxy_secrets.yaml --namespace=os-proxy
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-proxy/kube/os-proxy_daemonset.yaml --namespace=os-proxy
+
+ExecStartPost=-/usr/local/bin/kubectl create -f /etc/os-proxy/kube/os-proxy_service.yaml --namespace=os-proxy
+
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-proxy/kube/os-proxy_service.yaml --namespace=os-proxy
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-proxy/kube/os-proxy_daemonset.yaml --namespace=os-proxy
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-proxy/kube/os-proxy_secrets.yaml --namespace=os-proxy
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-proxy/kube/os-proxy_volume_claim.yaml --namespace=os-proxy
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-proxy/kube/os-proxy_volume_definition.yaml --namespace=os-proxy
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_service.yaml --namespace=os-proxy
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-glusterfs/kube/os-glusterfs_endpoints.yaml --namespace=os-proxy
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

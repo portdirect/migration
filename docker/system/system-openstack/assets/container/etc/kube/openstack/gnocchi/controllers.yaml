@@ -1,0 +1,455 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: os-gnocchi
+  name: os-gnocchi
+spec:
+  capacity:
+    storage: 90Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: glusterfs.{{OS_DOMAIN}}
+    path: /os-gnocchi
+    readOnly: false
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: os-gnocchi
+  name: os-gnocchi
+  namespace: os-gnocchi
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 90Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gnocchi-manager
+  namespace: os-gnocchi
+type: Opaque
+data:
+  ipa-ds-password: {{IPA_DS_PASSWORD}}
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  gnocchi-keystone-user: {{GNOCCHI_KEYSTONE_USER}}
+  gnocchi-keystone-password: {{GNOCCHI_KEYSTONE_PASSWORD}}
+  gnocchi-db-name: {{GNOCCHI_DB_NAME}}
+  gnocchi-db-user: {{GNOCCHI_DB_USER}}
+  gnocchi-db-password: {{GNOCCHI_DB_PASSWORD}}
+  grafana-db-name: {{GRAFANA_DB_NAME}}
+  grafana-db-user: {{GRAFANA_DB_USER}}
+  grafana-db-password: {{GRAFANA_DB_PASSWORD}}
+  grafana-ldap-name: {{GRAFANA_LDAP_USER}}
+  grafana-ldap-password: {{GRAFANA_LDAP_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: gnocchi-manager
+    version: v0.1.0
+  name: gnocchi-manager
+  namespace: os-gnocchi
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: gnocchi-manager
+        version: v0.1.0
+      name: gnocchi-manager
+      namespace: os-gnocchi
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: gnocchi-manager
+          image:  docker.io/port/gnocchi-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /usr/lib/python3.4/site-packages/requests/cacert.pem
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: ipa-ldap-config
+              mountPath: /etc/openldap/ldap.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+            - name: os-gnocchi
+              mountPath: "/var/lib/gnocchi"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: gnocchi-manager
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: ipa-ldap-config
+          hostPath:
+            path: /etc/openldap/ldap.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+        - name: os-gnocchi
+          persistentVolumeClaim:
+            claimName: os-gnocchi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gnocchi
+  namespace: os-gnocchi
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  gnocchi-keystone-user: {{GNOCCHI_KEYSTONE_USER}}
+  gnocchi-keystone-password: {{GNOCCHI_KEYSTONE_PASSWORD}}
+  gnocchi-db-name: {{GNOCCHI_DB_NAME}}
+  gnocchi-db-user: {{GNOCCHI_DB_USER}}
+  gnocchi-db-password: {{GNOCCHI_DB_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: gnocchi
+    version: v0.1.0
+  name: gnocchi
+  namespace: os-gnocchi
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: gnocchi
+        version: v0.1.0
+      name: gnocchi
+      namespace: os-gnocchi
+    spec:
+      nodeSelector:
+        openstack-gnocchi: 'true'
+        arch: 'x86'
+      containers:
+        - name: gnocchi
+          image: docker.io/port/gnocchi-api:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+          - containerPort: 8041
+            name: http
+            protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /usr/lib/python3.4/site-packages/requests/cacert.pem
+              readOnly: true
+            - name: os-gnocchi
+              mountPath: "/var/lib/gnocchi"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: gnocchi
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: os-ssl
+          secret:
+            secretName: gnocchi-ssl-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: os-gnocchi
+          persistentVolumeClaim:
+            claimName: os-gnocchi
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: gnocchi-metricd
+    version: v0.1.0
+  name: gnocchi-metricd
+  namespace: os-gnocchi
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: gnocchi-metricd
+        version: v0.1.0
+      name: gnocchi-metricd
+      namespace: os-gnocchi
+    spec:
+      nodeSelector:
+        openstack-gnocchi: 'true'
+        arch: 'x86'
+      containers:
+        - name: gnocchi-metricd
+          image: docker.io/port/gnocchi-metricd:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /usr/lib/python3.4/site-packages/requests/cacert.pem
+              readOnly: true
+            - name: os-gnocchi
+              mountPath: "/var/lib/gnocchi"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: gnocchi
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: os-gnocchi
+          persistentVolumeClaim:
+            claimName: os-gnocchi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana
+  namespace: os-gnocchi
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  grafana-db-name: {{GRAFANA_DB_NAME}}
+  grafana-db-user: {{GRAFANA_DB_USER}}
+  grafana-db-password: {{GRAFANA_DB_PASSWORD}}
+  grafana-ldap-name: {{GRAFANA_LDAP_USER}}
+  grafana-ldap-password: {{GRAFANA_LDAP_PASSWORD}}
+  grafana-secret-key: {{GRAFANA_SECRET_KEY}}
+  grafana-smtp-host: {{GRAFANA_SMTP_HOST}}
+  grafana-smtp-port: {{GRAFANA_SMTP_PORT}}
+  grafana-smtp-user: {{GRAFANA_SMTP_USER}}
+  grafana-smtp-pass: {{GRAFANA_SMTP_PASS}}
+  grafana-default-from-email: {{GRAFANA_DEFAULT_FROM_EMAIL}}
+  grafana-default-admin-email: {{GRAFANA_DEFAULT_ADMIN_EMAIL}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: grafana
+    version: v0.1.0
+  name: grafana
+  namespace: os-gnocchi
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: grafana
+        version: v0.1.0
+      name: grafana
+      namespace: os-gnocchi
+    spec:
+      nodeSelector:
+        openstack-gnocchi: 'true'
+        arch: 'x86'
+      containers:
+        - name: grafana
+          image: docker.io/port/gnocchi-grafana:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /usr/lib/python3.4/site-packages/requests/cacert.pem
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/ipa/ca.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: ipa-ldap-config
+              mountPath: /etc/openldap/ldap.conf
+              readOnly: true
+          securityContext:
+            privileged: false
+        - name: grafana-auth-proxy
+          image: docker.io/port/gnocchi-grafana-proxy:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: LOCAL_HTTP_PORT
+              value: "3003"
+            - name: PUBLISH_HTTPS_PORT
+              value: "3000"
+          ports:
+          - containerPort: 3000
+            name: https
+            protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: os-websso
+              mountPath: "/etc/os-websso"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: grafana
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: os-ssl
+          secret:
+            secretName: grafana-ssl-secret
+        - name: os-websso
+          secret:
+            secretName: grafana-websso-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: ipa-ldap-config
+          hostPath:
+            path: /etc/openldap/ldap.conf

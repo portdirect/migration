@@ -1,0 +1,51 @@
+version: "2"
+services:
+  kubelet:
+    container_name: "kubelet"
+    image: "docker.io/port/system-kube:latest"
+    restart: "always"
+    privileged: true
+    network_mode: "host"
+    pid: "host"
+    environment:
+      - ETCD_AUTHORITY=etcd-network.{{OS_DOMAIN}}:4001
+      - ETCD_SCHEME=https
+      - ETCD_CA_CERT_FILE=/etc/harbor/auth/host/ca.crt
+      - ETCD_CERT_FILE=/etc/harbor/auth/host/host.crt
+      - ETCD_KEY_FILE=/etc/harbor/auth/host/host.key
+    volumes:
+      - "/sys:/sys:ro"
+      - "/var/run:/var/run:rw"
+      - "/:/rootfs:ro"
+      - "/dev:/dev:rw"
+      - "/etc/cni/net.d:/etc/cni/net.d:rw"
+      - "/var/lib/docker:/var/lib/docker:rw"
+      - "/var/lib/kubelet:/var/lib/kubelet:rw"
+      - "/etc/os-release:/etc/os-release:ro"
+      - "/etc/kubernetes/manifests:/etc/kubernetes/manifests:ro"
+      - "/etc/harbor/auth/host/ca.crt:/etc/harbor/auth/host/ca.crt:ro"
+      - "/etc/harbor/auth/host/host.crt:/etc/harbor/auth/host/host.crt:ro"
+      - "/etc/harbor/auth/host/host.key:/etc/harbor/auth/host/host.key:ro"
+      - "/etc/harbor/auth/kubelet/kubeconfig.yaml:/etc/harbor/auth/kubelet/kubeconfig.yaml:ro"
+    command:
+      - "/hyperkube"
+      - "kubelet"
+      - "--v=3"
+      - "--port=10250"
+      - "--read-only-port=0"
+      - "--address=0.0.0.0"
+      - "--allow-privileged=true"
+      - "--cluster-dns=172.17.42.1"
+      - "--cluster-domain={{OS_DOMAIN}}"
+      - "--config=/etc/kubernetes/manifests"
+      - "--hostname-override={{HOST_FQDN}}"
+      - "--api-servers=https://kubernetes.{{OS_DOMAIN}}:6443"
+      - "--logtostderr=true"
+      - "--docker=unix:///var/run/docker.sock"
+      - "--network-plugin-dir=/etc/cni/net.d"
+      - "--network-plugin=cni"
+      - "--pod-infra-container-image=docker.io/port/pause:latest"
+      - "--kubeconfig=/etc/harbor/auth/kubelet/kubeconfig.yaml"
+      - "--tls-cert-file=/etc/harbor/auth/host/host.crt"
+      - "--tls-private-key-file=/etc/harbor/auth/host/host.key"
+      - "--containerized"

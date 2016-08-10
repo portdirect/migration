@@ -1,0 +1,11 @@
+server:
+  image: registry.harboros.net:3040/harboros/pxe-base:latest
+  net: none
+  privileged: true
+  env_file:
+   - /etc/pxe/pxe-run.env
+  volumes:
+   - /usr/share/nginx/html
+   - /etc/pxe/pxe.env:/etc/pxe/pxe.env:ro
+   - /root/.ssh/id_rsa.pub:/root/.ssh/id_rsa.pub:ro
+   - /etc/etcd/etcd.conf:/etc/etcd/etcd.conf:ro

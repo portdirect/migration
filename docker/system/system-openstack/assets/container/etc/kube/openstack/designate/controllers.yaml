@@ -1,0 +1,633 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: designate-manager
+  namespace: os-designate
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  designate-keystone-user: {{DESIGNATE_KEYSTONE_USER}}
+  designate-keystone-password: {{DESIGNATE_KEYSTONE_PASSWORD}}
+  designate-db-name: {{DESIGNATE_DB_NAME}}
+  designate-db-user: {{DESIGNATE_DB_USER}}
+  designate-db-password: {{DESIGNATE_DB_PASSWORD}}
+  designate-pool-db-name: {{DESIGNATE_POOL_DB_NAME}}
+  designate-pool-db-user: {{DESIGNATE_POOL_DB_USER}}
+  designate-pool-db-password: {{DESIGNATE_POOL_DB_PASSWORD}}
+  designate-pdns-db-name: {{DESIGNATE_PDNS_DB_NAME}}
+  designate-pdns-db-user: {{DESIGNATE_PDNS_DB_USER}}
+  designate-pdns-db-password: {{DESIGNATE_PDNS_DB_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: designate-manager
+    version: v0.1.0
+  name: designate-manager
+  namespace: os-designate
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: designate-manager
+        version: v0.1.0
+      name: designate-manager
+      namespace: os-designate
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: designate-manager
+          image:  docker.io/port/designate-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/ipa/ca.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: designate-manager
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: designate
+  namespace: os-designate
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  designate-keystone-user: {{DESIGNATE_KEYSTONE_USER}}
+  designate-keystone-password: {{DESIGNATE_KEYSTONE_PASSWORD}}
+  designate-db-name: {{DESIGNATE_DB_NAME}}
+  designate-db-user: {{DESIGNATE_DB_USER}}
+  designate-db-password: {{DESIGNATE_DB_PASSWORD}}
+  designate-pool-db-name: {{DESIGNATE_POOL_DB_NAME}}
+  designate-pool-db-user: {{DESIGNATE_POOL_DB_USER}}
+  designate-pool-db-password: {{DESIGNATE_POOL_DB_PASSWORD}}
+  designate-pdns-db-name: {{DESIGNATE_PDNS_DB_NAME}}
+  designate-pdns-db-user: {{DESIGNATE_PDNS_DB_USER}}
+  designate-pdns-db-password: {{DESIGNATE_PDNS_DB_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: designate
+    version: v0.1.0
+  name: designate
+  namespace: os-designate
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: designate
+        version: v0.1.0
+      name: designate
+      namespace: os-designate
+    spec:
+      nodeSelector:
+        openstack-designate: 'true'
+        arch: 'x86'
+      containers:
+        - name: designate
+          image: docker.io/port/designate-api:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+        - name: designate-tls
+          image: docker.io/port/haproxy-ssl-terminator:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: LOCAL_HTTP_PORT
+              value: "9981"
+            - name: PUBLISH_HTTPS_PORT
+              value: "9001"
+          ports:
+          - containerPort: 9001
+            name: https
+            protocol: TCP
+          volumeMounts:
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: designate
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: os-ssl
+          secret:
+            secretName: designate-ssl-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: designate-components
+  namespace: os-designate
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  designate-keystone-user: {{DESIGNATE_KEYSTONE_USER}}
+  designate-keystone-password: {{DESIGNATE_KEYSTONE_PASSWORD}}
+  designate-db-name: {{DESIGNATE_DB_NAME}}
+  designate-db-user: {{DESIGNATE_DB_USER}}
+  designate-db-password: {{DESIGNATE_DB_PASSWORD}}
+  designate-pool-db-name: {{DESIGNATE_POOL_DB_NAME}}
+  designate-pool-db-user: {{DESIGNATE_POOL_DB_USER}}
+  designate-pool-db-password: {{DESIGNATE_POOL_DB_PASSWORD}}
+  designate-pdns-db-name: {{DESIGNATE_PDNS_DB_NAME}}
+  designate-pdns-db-user: {{DESIGNATE_PDNS_DB_USER}}
+  designate-pdns-db-password: {{DESIGNATE_PDNS_DB_PASSWORD}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: designate-central
+    version: v0.1.0
+  name: designate-central
+  namespace: os-designate
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: designate-central
+        version: v0.1.0
+      name: designate-central
+      namespace: os-designate
+    spec:
+      nodeSelector:
+        openstack-designate: 'true'
+        arch: 'x86'
+      containers:
+        - name: designate-central
+          image: docker.io/port/designate-central:latest
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: designate-components
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: designate-pool-manager
+    version: v0.1.0
+  name: designate-pool-manager
+  namespace: os-designate
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: designate-pool-manager
+        version: v0.1.0
+      name: designate-pool-manager
+      namespace: os-designate
+    spec:
+      nodeSelector:
+        openstack-designate: 'true'
+        arch: 'x86'
+      containers:
+        - name: designate-pool-manager
+          image: docker.io/port/designate-pool-manager:latest
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: designate-components
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: designate-zone-manager
+    version: v0.1.0
+  name: designate-zone-manager
+  namespace: os-designate
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: designate-zone-manager
+        version: v0.1.0
+      name: designate-zone-manager
+      namespace: os-designate
+    spec:
+      nodeSelector:
+        openstack-designate: 'true'
+        arch: 'x86'
+      containers:
+        - name: designate-pool-manager
+          image: docker.io/port/designate-zone-manager:latest
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: designate-components
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: designate-mdns
+    version: v0.1.0
+  name: designate-mdns
+  namespace: os-designate
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: designate-mdns
+        version: v0.1.0
+      name: designate-mdns
+      namespace: os-designate
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        openstack-designate: 'true'
+        arch: 'x86'
+      containers:
+        - name: designate-mdns
+          image: docker.io/port/designate-mdns:latest
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+            - containerPort: 5354
+              name: mdns-tcp
+              protocol: TCP
+            - containerPort: 5354
+              name: mdns-udp
+              protocol: UDP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      hostNetwork: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: designate-components
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: designate-sink
+    version: v0.1.0
+  name: designate-sink
+  namespace: os-designate
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: designate-sink
+        version: v0.1.0
+      name: designate-sink
+      namespace: os-designate
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        openstack-designate: 'true'
+        arch: 'x86'
+      containers:
+        - name: designate-sink
+          image: docker.io/port/designate-sink:latest
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: designate-components
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: designate-dns
+    version: v0.1.0
+  name: designate-dns
+  namespace: os-designate
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: designate-dns
+        version: v0.1.0
+      name: designate-dns
+      namespace: os-designate
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        openstack-designate: 'true'
+        arch: 'x86'
+      containers:
+        - name: designate-agent
+          image: docker.io/port/designate-agent:latest
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+            - containerPort: 5358
+              name: agent
+              protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: designate-data
+              mountPath: /var/pod-shared
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: designate-pdns
+          image: docker.io/port/designate-pdns:latest
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+            - containerPort: 553
+              name: dns-tcp
+              protocol: TCP
+            - containerPort: 553
+              name: dns-udp
+              protocol: UDP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: designate-data
+              mountPath: /var/pod-shared
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      hostNetwork: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: designate-components
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: designate-data
+          emptyDir: {}

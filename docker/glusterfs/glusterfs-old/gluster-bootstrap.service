@@ -1,0 +1,11 @@
+[Unit]
+Description=Bootstrap GlusterFS
+After=glusterd.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bootstrap-gluster.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

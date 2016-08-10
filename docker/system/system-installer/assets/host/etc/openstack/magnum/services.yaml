@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: magnum
+  name: os-magnum
+  namespace: os-magnum
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 443
+    targetPort: 9511
+    protocol: TCP
+    name: https
+  selector:
+    openstack-app: magnum
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    openstack-app: magnum-conductor
+  name: magnum-conductor
+  namespace: os-magnum
+spec:
+  clusterIP: 'None'
+  ports:
+  - port: 1
+  selector:
+    openstack-app: magnum-conductor

@@ -1,0 +1,4 @@
+/etc/os-common/common.env
+/etc/skydns/skydns.env
+/etc/os-glusterfs/os-glusterfs.env
+/etc/os-glusterfs/credentials-os-glusterfs.env

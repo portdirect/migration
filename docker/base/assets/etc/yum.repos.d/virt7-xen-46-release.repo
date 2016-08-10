@@ -1,0 +1,5 @@
+[virt7-xen-46-release]
+name=virt7-xen-46-release
+baseurl=http://cbs.centos.org/repos/virt7-xen-46-release/x86_64/os/
+enabled=1
+gpgcheck=0

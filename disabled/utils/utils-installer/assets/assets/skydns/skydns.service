@@ -1,0 +1,22 @@
+[Unit]
+Description=HarborOS: Skydns Server
+After=etcd.service docker.service skydns-preflight.service
+Requires=etcd.service docker.service
+
+[Service]
+TimeoutStartSec=0
+Restart=always
+RestartSec=10
+
+EnvironmentFile=/etc/skydns/skydns-run
+
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock stop skydns
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock kill skydns
+ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker-bootstrap.sock rm -v skydns
+
+ExecStart=/var/usrlocal/bin/skydns-start.sh
+
+ExecStop=/var/usrlocal/bin/skydns-stop.sh
+
+[Install]
+WantedBy=docker.service

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<!--[if IE 9]><html lang="en-us" class="ie9 layout-pf-alt layout-pf-alt-fixed layout-pf-alt-fixed-inner-scroll"><![endif]-->
+<!--[if gt IE 9]><!-->
+<html lang="en-us" class="layout-pf-alt layout-pf-alt-fixed layout-pf-alt-fixed-inner-scroll">
+  <!--<![endif]-->
+  <head>
+    <!-- mobile first -->
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- TODO: package jquery instead of pulling from the CDN -->
+    <script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script src="//code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+    <!-- patternfly -->
+    <link rel="stylesheet" type="text/css" href="/assets/css/patternfly.min.css">
+    <link rel="stylesheet" type="text/css" href="/assets/css/patternfly-additions.min.css">
+    <!-- harbor -->
+    <link rel="stylesheet" type="text/css" href="/assets/css/harbor.css">
+    <script src="/assets/js/patternfly.js"></script>
+  </head>
+  <body class="cards-pf">
+    <nav class="navbar navbar-pf-alt">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="http://port.direct" target="_self">
+          <span class="navbar-brand-icon navbar-brand-name">
+          <span class="fa fa-anchor"></span> port.direct</span>
+        </a>
+      </div>
+      <nav class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          <li>
+            <a href="http://port.direct/" target="" class="nav-item-iconic nav-item-iconic">
+              <span title="Home" class="fa fa-home"></span>
+            </a>
+          </li>
+        </ul>
+        <ul class="nav navbar-nav navbar-right navbar-iconic">
+          <li>
+            <a href="http://api.port.direct/" target="" class="nav-item-iconic nav-item-iconic">
+              <span title="Login" class="fa fa-sign-in"></span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </nav>
+    <nav class="nav-pf-vertical-alt">
+      <ul class="list-group">
+        <li class="list-group-item active">
+          <a href="/user">
+            <span class="fa fa-user-plus" title="" data-toggle="tooltip" data-placement="right" data-original-title="Dashboard"></span>
+            <span class="list-group-item-value">Sign Up</span>
+          </a>
+        </li>
+        <li class="list-group-item">
+          <a href="/request_reset">
+            <span class="fa fa-ticket" title="" data-toggle="tooltip" data-placement="right" data-original-title="My Services"></span>
+            <span class="list-group-item-value">Password Reset</span>
+          </a>
+        </li>
+        <li class="list-group-item">
+          <a href="https://freeipa-master.port.direct/ipa/ui/reset_password.html">
+            <span class="fa fa-key" title="" data-toggle="tooltip" data-placement="right" data-original-title="My Items"></span>
+            <span class="list-group-item-value">Change Password</span>
+          </a>
+        </li>
+        <li class="list-group-item list-group-item-separator hidden-sm hidden-md hidden-lg">
+          <a href="#">
+            <span class="fa pficon-service" title="Login"></span>
+            <span class="list-group-item-value">Login</span>
+          </a>
+        </li>
+        <li class="list-group-item hidden-sm hidden-md hidden-lg">
+          <a href="http://port.direct">
+            <span class="fa fa-home" title="Home"></span>
+            <span class="list-group-item-value">Home</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+    <div class="container-fluid container-cards-pf container-pf-alt-nav-pf-vertical-alt">
+      {% block content %}
+      <div class="container">
+          <h1>Welcome to the port.direct user management portal</h1>
+          <p>During the preview period you account will be manually activated, once approved you will be able to set a password and use the <a href="http://port.direct">port.direct</a> web services.</p>
+      </div>
+      {% endblock %}
+    </div>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+[Unit]
+Description=HarborOS: OpenStack: Neutron Manager: Service
+After=docker.service freeipa.service os-database.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+EnvironmentFile=/etc/os-common/common.env
+RemainAfterExit=True
+
+
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/var/usrlocal/bin/os-neutron-manager-flight.sh
+ExecStart=/bin/echo 'Neutron Configured'
+ExecStartPost=/usr/local/bin/etcdctl set /${OS_DISTRO}/os-neutron/status DOWN
+
+ExecStop=/usr/local/bin/etcdctl set /${OS_DISTRO}/os-neutron/status DOWN
+
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-neutron/kube/os-neutron-manager_replicationcontroller.yaml --namespace=os-neutron
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=os-neutron-api.service

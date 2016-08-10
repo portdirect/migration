@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: etcd-docker
+    version: v0.1.0
+  name: etcd-docker
+  namespace: docker-system
+spec:
+  hostNetwork: true
+  containers:
+  - name: etcd-docker
+    image: docker.io/port/system-etcd:latest
+    ports:
+    - containerPort: 403
+      hostPort: 403
+      name: etcd
+    - containerPort: 703
+      hostPort: 703
+      name: peers
+    command:
+    - etcd
+    - --name=master
+    - --data-dir=/var/etcd
+    - --listen-client-urls=https://0.0.0.0:403
+    - --listen-peer-urls=https://0.0.0.0:703
+    - --advertise-client-urls=https://etcd-docker.{{OS_DOMAIN}}:4003
+    - --initial-cluster-token='etcd-cluster'
+    - --ca-file=/etc/os-ssl/ca.crt
+    - --cert-file=/etc/os-ssl/etcd-docker.crt
+    - --key-file=/etc/os-ssl/etcd-docker.key
+    - --peer-ca-file=/etc/os-ssl/ca.crt
+    - --peer-cert-file=/etc/os-ssl/etcd-docker.crt
+    - --peer-key-file=/etc/os-ssl/etcd-docker.key
+    volumeMounts:
+      - mountPath: /etc/os-ssl
+        name: os-ssl
+      - mountPath: /var/etcd
+        name: etcd-docker
+  volumes:
+    - name: "os-ssl"
+      hostPath:
+        path: "/etc/harbor/auth/etcd-docker"
+    - name: "etcd-docker"
+      hostPath:
+        path: "/var/lib/harbor/etcd/docker"

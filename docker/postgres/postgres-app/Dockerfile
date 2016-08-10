@@ -1,0 +1,1 @@
+FROM %%DOCKER_NAMESPACE%%/%%DOCKER_PREFIX%%postgres-base:%%DOCKER_TAG%%

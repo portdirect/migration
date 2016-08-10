@@ -1,0 +1,733 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: os-swift
+  name: os-swift
+spec:
+  capacity:
+    storage: 200Gi
+  accessModes:
+    - ReadWriteMany
+  glusterfs:
+    endpoints: gluster-fs
+    path: os-swift
+    readOnly: false
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: os-swift
+  name: os-swift
+  namespace: os-swift
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 200Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: swift-manager
+  namespace: os-swift
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  core-etcd-endpoint: {{CORE_ETCD_ENDPOINT}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+  swift-keystone-user: {{SWIFT_KEYSTONE_USER}}
+  swift-keystone-password: {{SWIFT_KEYSTONE_PASSWORD}}
+  swift-device: {{SWIFT_DEVICE}}
+  swift-hash-path-suffix: {{SWIFT_HASH_PATH_SUFFIX}}
+  swift-hash-path-prefix: {{SWIFT_HASH_PATH_PREFIX}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: swift-manager
+    version: v0.1.0
+  name: swift-manager
+  namespace: os-swift
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: swift-manager
+        version: v0.1.0
+      name: swift-manager
+      namespace: os-swift
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: swift-manager
+          image:  docker.io/port/swift-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+            - name: os-swift
+              mountPath: "/srv/glusterfs"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: swift-manager
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+        - name: os-swift
+          persistentVolumeClaim:
+            claimName: os-swift
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: swift
+  namespace: os-swift
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  core-etcd-endpoint: {{CORE_ETCD_ENDPOINT}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+  swift-keystone-user: {{SWIFT_KEYSTONE_USER}}
+  swift-keystone-password: {{SWIFT_KEYSTONE_PASSWORD}}
+  swift-device: {{SWIFT_DEVICE}}
+  swift-hash-path-suffix: {{SWIFT_HASH_PATH_SUFFIX}}
+  swift-hash-path-prefix: {{SWIFT_HASH_PATH_PREFIX}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: swift
+    version: v0.1.0
+  name: swift
+  namespace: os-swift
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: swift
+        version: v0.1.0
+      name: swift
+      namespace: os-swift
+    spec:
+      nodeSelector:
+        openstack-swift: 'true'
+        arch: 'x86'
+      containers:
+        - name: swift-proxy
+          image: docker.io/port/swift-proxy:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+          - containerPort: 8088
+            name: https
+            protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: proxy-signing-cache
+              mountPath: "/var/cache/swift"
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: swift-proxy-memcached
+          image: docker.io/port/system-memcached:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "0.1"
+            limits:
+              memory: "64Mi"
+              cpu: "0.2"
+          securityContext:
+            privileged: false
+      volumes:
+        - name: os-config
+          secret:
+            secretName: swift
+        - name: os-ssl
+          secret:
+            secretName: swift-ssl-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: proxy-signing-cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: swift-storage-rsync
+  namespace: os-swift
+type: Opaque
+data:
+  swift-device: {{SWIFT_DEVICE}}
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: swift-storage-rsync
+    version: v0.1.0
+  name: swift-storage-rsync
+  namespace: os-swift
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: swift-storage-rsync
+        version: v0.1.0
+      name: swift-storage-rsync
+      namespace: os-swift
+    spec:
+      nodeSelector:
+        swift: 'true'
+        arch: 'x86'
+      containers:
+        - name: swift-storage-rsync
+          image: docker.io/port/swift-rsync:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+            - containerPort: 873
+              name: rsync
+              protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: pod-swift-node
+              mountPath: "/srv/pod"
+              readOnly: false
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.3"
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: swift-storage-rsync
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: srv-node
+          hostPath:
+            path: /mnt/swift
+        - name: pod-swift-node
+          hostPath:
+            path: /var/lib/harbor/swift/pod
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: swift-storage-account
+  namespace: os-swift
+type: Opaque
+data:
+  core-etcd-endpoint: {{CORE_ETCD_ENDPOINT}}
+  swift-device: {{SWIFT_DEVICE}}
+  swift-hash-path-suffix: {{SWIFT_HASH_PATH_SUFFIX}}
+  swift-hash-path-prefix: {{SWIFT_HASH_PATH_PREFIX}}
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: swift-storage-account
+    version: v0.1.0
+  name: swift-storage-account
+  namespace: os-swift
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: swift-storage-account
+        version: v0.1.0
+      name: swift-storage-account
+      namespace: os-swift
+    spec:
+      nodeSelector:
+        swift: 'true'
+        arch: 'x86'
+      containers:
+        - name: swift-account-server
+          image: docker.io/port/swift-account:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: SWIFT_SUBCOMPONENT
+              value: server
+          ports:
+            - containerPort: 6002
+              name: swift-acc
+              protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: pod-swift-node
+              mountPath: "/srv/pod"
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: swift-account-auditor
+          image: docker.io/port/swift-account:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: SWIFT_SUBCOMPONENT
+              value: auditor
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: pod-swift-node
+              mountPath: "/srv/pod"
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: swift-account-reaper
+          image: docker.io/port/swift-account:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: SWIFT_SUBCOMPONENT
+              value: reaper
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: pod-swift-node
+              mountPath: "/srv/pod"
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: swift-account-replicator
+          image: docker.io/port/swift-account:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: SWIFT_SUBCOMPONENT
+              value: replicator
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: pod-swift-node
+              mountPath: "/srv/pod"
+              readOnly: false
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: swift-storage-account
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: srv-node
+          hostPath:
+            path: /mnt/swift
+        - name: pod-swift-node
+          hostPath:
+            path: /var/lib/harbor/swift/pod
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: swift-storage-container
+  namespace: os-swift
+type: Opaque
+data:
+  core-etcd-endpoint: {{CORE_ETCD_ENDPOINT}}
+  swift-device: {{SWIFT_DEVICE}}
+  swift-hash-path-suffix: {{SWIFT_HASH_PATH_SUFFIX}}
+  swift-hash-path-prefix: {{SWIFT_HASH_PATH_PREFIX}}
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: swift-storage-container
+    version: v0.1.0
+  name: swift-storage-container
+  namespace: os-swift
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: swift-storage-container
+        version: v0.1.0
+      name: swift-storage-container
+      namespace: os-swift
+    spec:
+      nodeSelector:
+        swift: 'true'
+        arch: 'x86'
+      containers:
+        - name: swift-container-server
+          image: docker.io/port/swift-container:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: SWIFT_SUBCOMPONENT
+              value: server
+          ports:
+            - containerPort: 6001
+              name: swift-cont
+              protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: pod-swift-node
+              mountPath: "/srv/pod"
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: swift-container-auditor
+          image: docker.io/port/swift-container:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: SWIFT_SUBCOMPONENT
+              value: auditor
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: pod-swift-node
+              mountPath: "/srv/pod"
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: swift-container-replicator
+          image: docker.io/port/swift-container:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: SWIFT_SUBCOMPONENT
+              value: replicator
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: pod-swift-node
+              mountPath: "/srv/pod"
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: swift-container-updater
+          image: docker.io/port/swift-container:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: SWIFT_SUBCOMPONENT
+              value: updater
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: pod-swift-node
+              mountPath: "/srv/pod"
+              readOnly: false
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: swift-storage-container
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: srv-node
+          hostPath:
+            path: /mnt/swift
+        - name: pod-swift-node
+          hostPath:
+            path: /var/lib/harbor/swift/pod
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: swift-storage-object
+  namespace: os-swift
+type: Opaque
+data:
+  core-etcd-endpoint: {{CORE_ETCD_ENDPOINT}}
+  swift-device: {{SWIFT_DEVICE}}
+  swift-hash-path-suffix: {{SWIFT_HASH_PATH_SUFFIX}}
+  swift-hash-path-prefix: {{SWIFT_HASH_PATH_PREFIX}}
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: swift-storage-object
+    version: v0.1.0
+  name: swift-storage-object
+  namespace: os-swift
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: swift-storage-object
+        version: v0.1.0
+      name: swift-storage-object
+      namespace: os-swift
+    spec:
+      nodeSelector:
+        swift: 'true'
+        arch: 'x86'
+      containers:
+        - name: swift-object-server
+          image: docker.io/port/swift-object:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: SWIFT_SUBCOMPONENT
+              value: server
+          ports:
+            - containerPort: 6000
+              name: swift-object
+              protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: pod-swift-node
+              mountPath: "/srv/pod"
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: swift-object-auditor
+          image: docker.io/port/swift-object:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: SWIFT_SUBCOMPONENT
+              value: auditor
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: pod-swift-node
+              mountPath: "/srv/pod"
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: swift-object-replicator
+          image: docker.io/port/swift-object:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: SWIFT_SUBCOMPONENT
+              value: replicator
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: pod-swift-node
+              mountPath: "/srv/pod"
+              readOnly: false
+          securityContext:
+            privileged: false
+        - name: swift-object-updater
+          image: docker.io/port/swift-object:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+            - name: SWIFT_SUBCOMPONENT
+              value: updater
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: srv-node
+              mountPath: "/srv/node"
+              readOnly: false
+            - name: pod-swift-node
+              mountPath: "/srv/pod"
+              readOnly: false
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: swift-storage-object
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: srv-node
+          hostPath:
+            path: /mnt/swift
+        - name: pod-swift-node
+          hostPath:
+            path: /var/lib/harbor/swift/pod

@@ -1,0 +1,25 @@
+#!/bin/bash
+set -e
+PATH=${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+
+ip link set dev docker down || true
+brctl delbr docker || true
+brctl addbr docker || true
+ip addr add ${DOCKER_BOOTSTRAP_NETWORK} dev docker || true
+ip link set dev docker mtu 1500 || true
+ip link set dev docker up || true
+
+DOCKER_BOOTSTRAP_IP=$(echo ${DOCKER_BOOTSTRAP_NETWORK} | awk -F '/' '{print $1}')
+exec /usr/bin/docker-current daemon \
+        --exec-opt native.cgroupdriver=systemd \
+        -H unix:///var/run/docker-bootstrap.sock \
+        -p /var/run/docker-bootstrap.pid \
+        --graph=/var/lib/docker-bootstrap \
+        --bridge=docker \
+        --dns="${EXTERNAL_DNS}" \
+        --mtu=1500 \
+        --fixed-cidr=${DOCKER_BOOTSTRAP_NETWORK} \
+        --ip=${DOCKER_BOOTSTRAP_IP} \
+        --userland-proxy=false \
+        --storage-driver overlay

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e
+set -o xtrace
+
+# DO NOT enable or start mysqld for systemd, let the guestagent coordinate startup
+# Enable and start service
+systemctl disable mysqld.service
+systemctl stop mysqld.service
+systemctl status mysqld.service

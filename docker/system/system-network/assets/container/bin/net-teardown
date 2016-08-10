@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+# Default settings
+: ${DOCKER_BRIDGE_NAME:="docker0"}
+
+
+
+
+if [ ! -f /host/etc/harbor-network ]; then
+    # Deactivate the docker0 bridge
+    (ip link set ${DOCKER_BRIDGE_NAME} down) || true
+    # Remove the docker0 bridge
+    (brctl delbr ${DOCKER_BRIDGE_NAME}) || true
+fi

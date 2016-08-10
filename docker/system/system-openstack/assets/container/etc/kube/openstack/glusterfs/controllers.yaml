@@ -1,0 +1,269 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: glusterfs-manager
+  namespace: os-glusterfs
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  glusterfs-device: {{GLUSTERFS_DEVICE}}
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: glusterfs-manager
+    version: v0.1.0
+  name: glusterfs-manager
+  namespace: os-glusterfs
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: glusterfs-manager
+        version: v0.1.0
+      name: glusterfs-manager
+      namespace: os-glusterfs
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: glusterfs-manager
+          image:  docker.io/port/glusterfs-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: glusterfs-manager
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: glusterfs
+  namespace: os-glusterfs
+type: Opaque
+data:
+  glusterfs-device: {{GLUSTERFS_DEVICE}}
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    openstack-app: glusterfs
+    version: v0.1.0
+  name: glusterfs
+  namespace: os-glusterfs
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: glusterfs
+        version: v0.1.0
+      name: glusterfs
+      namespace: os-glusterfs
+    spec:
+      nodeSelector:
+        glusterfs: 'true'
+        arch: 'x86'
+      containers:
+        - name: glusterfs
+          image: docker.io/port/glusterfs-base:latest
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 111
+            name: portmapper
+            protocol: TCP
+          - containerPort: 111
+            name: portmapper-udp
+            protocol: UDP
+          - containerPort: 2049
+            name: nfs
+            protocol: TCP
+          - containerPort: 24007
+            name: glusterd
+            protocol: TCP
+          - containerPort: 38465
+            name: gluster-nfs-1
+            protocol: TCP
+          - containerPort: 38466
+            name: gluster-nfs-2
+            protocol: TCP
+          - containerPort: 38467
+            name: gluster-nfs-3
+            protocol: TCP
+          - containerPort: 49152
+            name: brick-1
+            protocol: TCP
+          - containerPort: 49153
+            name: brick-2
+            protocol: TCP
+          - containerPort: 49154
+            name: brick-3
+            protocol: TCP
+          - containerPort: 49155
+            name: brick-4
+            protocol: TCP
+          - containerPort: 49156
+            name: brick-5
+            protocol: TCP
+          - containerPort: 49157
+            name: brick-6
+            protocol: TCP
+          - containerPort: 49158
+            name: brick-7
+            protocol: TCP
+          - containerPort: 49159
+            name: brick-8
+            protocol: TCP
+          - containerPort: 49160
+            name: brick-9
+            protocol: TCP
+          - containerPort: 49161
+            name: brick-10
+            protocol: TCP
+          - containerPort: 49162
+            name: brick-11
+            protocol: TCP
+          - containerPort: 49163
+            name: brick-12
+            protocol: TCP
+          - containerPort: 49164
+            name: brick-13
+            protocol: TCP
+          - containerPort: 49165
+            name: brick-14
+            protocol: TCP
+          - containerPort: 49166
+            name: brick-15
+            protocol: TCP
+          - containerPort: 49167
+            name: brick-16
+            protocol: TCP
+          - containerPort: 49168
+            name: brick-17
+            protocol: TCP
+          - containerPort: 49169
+            name: brick-18
+            protocol: TCP
+          - containerPort: 49170
+            name: brick-19
+            protocol: TCP
+          - containerPort: 49171
+            name: brick-20
+            protocol: TCP
+          - containerPort: 49172
+            name: brick-21
+            protocol: TCP
+          - containerPort: 49173
+            name: brick-22
+            protocol: TCP
+          - containerPort: 49174
+            name: brick-23
+            protocol: TCP
+          - containerPort: 49175
+            name: brick-24
+            protocol: TCP
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: dev
+              mountPath: /dev
+              readOnly: false
+            - name: run-lvm
+              mountPath: /run/lvm
+              readOnly: false
+            - name: bricks
+              mountPath: /bricks
+              readOnly: false
+            - name: var-lib-glusterd
+              mountPath: /var/lib/glusterd
+              readOnly: false
+            - name: gluster-exports
+              mountPath: /export
+              readOnly: false
+          securityContext:
+            privileged: true
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/stop.sh"]
+          resources:
+            requests:
+              memory: "4G"
+              cpu: "2"
+            limits:
+              cpu: "4"
+              memory: "5G"
+      hostNetwork: true
+      hostIPC: true
+      volumes:
+        - name: os-config
+          secret:
+            secretName: glusterfs
+        - name: os-ssl
+          secret:
+            secretName: glusterfs-ssl-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: dev
+          hostPath:
+            path: /dev
+        - name: run-lvm
+          hostPath:
+            path: /run/lvm
+        - name: bricks
+          emptyDir: {}
+        - name: gluster-exports
+          emptyDir: {}
+        - name: var-lib-glusterd
+          emptyDir: {}

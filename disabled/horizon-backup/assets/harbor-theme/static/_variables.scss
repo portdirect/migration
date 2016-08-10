@@ -1,0 +1,37 @@
+
+//== Components
+//
+//## Define common padding and border radius sizes and more. Values based on 14px text and 1.428 line-height (~20px to start).
+
+//== Modals
+//
+//##
+
+// Give modals more room to breathe in -md space
+$modal-md:                    732px;
+
+$font-path: $static_url + "/custom/fonts/patternfly";
+
+// Override the web font path ... we want to set this ourselves
+$web-font-path: "-";
+$roboto-font-path: $static_url + "/horizon/lib/roboto_fontface/fonts";
+
+//== Iconography
+//
+//## Specify custom location and filename of the included Glyphicons icon font. Useful for those including Bootstrap via Bower.
+
+//** Load fonts from this directory.
+$icon-font-path:          "/custom/fonts/patternfly";
+//** File name for all font files.
+$icon-font-name:          "glyphicons-halflings-regular";
+//** Element ID within SVG icon file.
+$icon-font-svg-id:        "glyphicons_halflingsregular";
+
+@import "patternfly/variables";
+@import "/bootstrap/scss/bootstrap/variables";
+@import "patternfly/variables";
+@import "patternfly/mixins";
+@import "horizon/variables";
+@import "/horizon/lib/font-awesome/scss/variables";
+@import "patternfly/mixin_overrides";
+$navbar-pf-alt-bg-img: url( $static_url + "/custom/images/patternfly/bg-navbar-pf-alt.svg")

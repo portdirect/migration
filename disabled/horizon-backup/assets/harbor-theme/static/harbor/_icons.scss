@@ -1,0 +1,323 @@
+// ICONS
+
+.hicon-project:before {
+    content: "";
+}
+
+.hicon-admin:before {
+    content: "";
+}
+
+.hicon-settings {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+.hicon-settings:before {
+    content: "\e610";
+}
+
+.hicon-identity {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+.hicon-identity:before {
+    content: "\e622";
+}
+
+
+
+
+.hicon-compute {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+.hicon-compute:before {
+    content: "\e90d";
+}
+
+.hicon-overview:before {
+    content: "";
+}
+
+.hicon-instances {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+
+.hicon-instances:before {
+    content: "\e621";
+}
+
+.hicon-images {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+.hicon-images:before {
+    content: "\e61f";
+}
+
+.hicon-access_and_security:before {
+    content: "";
+}
+
+
+
+
+
+.hicon-network {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+.hicon-network:before {
+    content: "\e909";
+}
+
+.hicon-network_topology {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+.hicon-network_topology:before {
+    content: "\e608";
+}
+
+.hicon-networks:before {
+    content: "";
+}
+
+.hicon-routers:before {
+    content: "";
+}
+
+
+
+.hicon-hypervisors:before {
+    content: "";
+}
+.hicon-aggregates:before {
+    content: "";
+}
+.hicon-flavors:before {
+    content: "";
+}
+.hicon-defaults:before {
+    content: "";
+}
+.hicon-metadata_defs {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+.hicon-metadata_defs:before {
+    content: "\e60a";
+}
+
+.hicon-info {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+.hicon-info:before {
+    content: "\e604";
+}
+
+
+.hicon-domains:before {
+    content: "";
+}
+.hicon-projects {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+.hicon-projects:before {
+    content: "\e606";
+}
+.hicon-users {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+.hicon-users:before {
+    content: "\e60f";
+}
+.hicon-groups {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+.hicon-groups:before {
+    content: "\e622";
+}
+.hicon-roles:before {
+    content: "";
+}
+
+
+
+
+
+
+.hicon-orchestration {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+.hicon-orchestration:before {
+    content: "\e624";
+}
+.hicon-stacks:before {
+    content: "\f06d";
+}
+
+
+
+
+
+.hicon-object_store {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+.hicon-object_store:before {
+    content: "\e90b";
+}
+
+.hicon-containers {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+.hicon-containers:before {
+    content: "\e606";
+}
+
+.hicon-murano:before {
+    content: "\f04b";
+}
+.hicon-deployment_group:before {
+    content: "\f19c";
+}
+.hicon-environments:before {
+    content: "\f0ac";
+}
+.hicon-catalog:before {
+    content: "\f135";
+}
+
+.hicon-manage_metadata {
+    display: inline-block;
+    font-family: 'PatternFlyIcons-webfont';
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: none;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+}
+.hicon-manage_metadata:before {
+    content: "\e610";
+}

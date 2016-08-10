@@ -1,0 +1,22 @@
+[Unit]
+Description=Etcd Master
+After=harbor-etcd-bootstrap.service
+Requires=harbor-etcd-bootstrap.service
+
+[Service]
+StandardOutput=null
+TimeoutStartSec=0
+RemainAfterExit=yes
+Type=simple
+
+ExecStartPre=-/usr/local/bin/harbor-docker stop etcd
+ExecStartPre=-/usr/local/bin/harbor-docker kill etcd
+ExecStartPre=-/usr/local/bin/harbor-docker rm -v etcd
+ExecStartPre=/usr/local/bin/etcd-launch
+ExecStart=/usr/local/bin/harbor-docker inspect etcd
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

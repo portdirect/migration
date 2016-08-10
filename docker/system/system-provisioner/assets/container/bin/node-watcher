@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+
+################################################################################
+echo "${OS_DISTRO}: Sourcing local environment variables"
+################################################################################
+source /etc/os-container.env
+
+: ${PXE_ETCDCTL:="etcdctl --peers=127.0.0.1:401"}
+
+while true
+do
+	echo "Watching ETCD and running the provisoning script on any change"
+  $PXE_ETCDCTL watch --recursive /
+  /bin/node-provisioner || true
+done

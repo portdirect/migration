@@ -1,0 +1,29 @@
+[Unit]
+Description=HarborOS: OpenStack: nova Service
+After=docker.service freeipa.service os-nova-manager.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+RemainAfterExit=True
+Restart=always
+RestartSec=10
+
+ExecStartPre=/var/usrlocal/bin/os-nova-api-preflight.sh
+
+#ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-nova/kube/os-nova-api_service.yaml --namespace=os-nova
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-nova/kube/os-nova-api_replicationcontroller.yaml --namespace=os-nova
+ExecStartPre=-/usr/local/bin/kubectl delete -f /etc/os-nova/kube/os-nova_secrets.yaml --namespace=os-nova
+
+ExecStartPre=/var/usrlocal/bin/freeipa-service-status.sh
+
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-nova/kube/os-nova_secrets.yaml --namespace=os-nova
+ExecStartPre=/usr/local/bin/kubectl create -f /etc/os-nova/kube/os-nova-api_replicationcontroller.yaml --namespace=os-nova
+ExecStart=/usr/local/bin/kubectl create -f /etc/os-nova/kube/os-nova-api_service.yaml --namespace=os-nova
+
+#ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-nova/kube/os-nova-api_service.yaml --namespace=os-nova
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-nova/kube/os-nova-api_replicationcontroller.yaml --namespace=os-nova
+ExecStop=-/usr/local/bin/kubectl delete -f /etc/os-nova/kube/os-nova_secrets.yaml --namespace=os-nova
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+PATH=${PATH}:/usr/local/bin
+
+if [ ! -f "/opt/harbor/bin/docker-compose" ]
+then
+    echo "Docker Compose is not installed on this host: doing so now"
+    mkdir -p /opt/harbor/bin
+    curl -L https://github.com/docker/compose/releases/download/1.6.2/run.sh > /opt/harbor/bin/docker-compose
+    chmod +x /opt/harbor/bin/docker-compose
+fi
+
+exec /opt/harbor/bin/docker-compose "$@"

@@ -1,0 +1,439 @@
+
+
+ovs-vsctl add-port br-ex test
+ovs-vsctl add-port br-provider test2
+ovs-vsctl set interface test type=patch options:peer=test2
+ovs-vsctl set interface test2 type=patch options:peer=test
+
+
+
+
+
+
+
+
+HOST_DOCKER_DEV=eth0
+HOST_DOCKER_IP=$(ip -f inet -o addr show $HOST_DOCKER_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+
+
+HOST_CALICO_DEV=eth0
+HOST_CALICO_IP=$(ip -f inet -o addr show $HOST_CALICO_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+
+
+
+HOST_ETCD_DEV=eth0
+HOST_ETCD_IP=$(ip -f inet -o addr show $HOST_ETCD_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+
+HOST_KUBE_DEV=eth0
+HOST_KUBE_IP=$(ip -f inet -o addr show $HOST_KUBE_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+
+
+MASTER_IP=10.120.100.230
+(
+hostnamectl set-hostname centos2.harboros.net
+
+
+echo "$HOST_DOCKER_IP $(hostname -s) $(hostname -f)" >> /etc/hosts
+yum install -y docker openvswitch etcd bridge-utils
+
+
+(
+curl -L https://github.com/docker/compose/releases/download/1.6.2/run.sh > /usr/bin/docker-compose
+chmod +x /usr/bin/docker-compose
+
+curl -L http://www.projectcalico.org/builds/calicoctl > /usr/bin/calicoctl
+chmod +x /usr/bin/calicoctl
+
+
+curl -L https://storage.googleapis.com/kubernetes-release/release/v1.2.4/bin/linux/amd64/kubectl > /usr/bin/kubectl
+chmod +x /usr/bin/kubectl
+
+)
+)
+
+
+
+
+cat > /usr/local/bin/docker-bootstrap-daemon <<EOF
+#!/bin/bash
+set -e
+PATH=/usr/local/bin:${PATH}
+exec /usr/bin/docker-current daemon \
+        --exec-opt native.cgroupdriver=systemd \\
+        -H unix:///var/run/docker-bootstrap.sock \\
+        -p /var/run/docker-bootstrap.pid \\
+        --graph=/var/lib/docker-bootstrap \\
+        --bridge=none \\
+        --userland-proxy=false \\
+        --storage-driver overlay
+EOF
+chmod +x /usr/local/bin/docker-bootstrap-daemon
+
+cat > /etc/systemd/system/docker-bootstrap.service <<EOF
+[Unit]
+Description=Docker Bootstrap Application Container Engine
+Documentation=https://docs.docker.com
+After=network-online.target cloud-init.service chronyd.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/docker-bootstrap-daemon
+MountFlags=slave
+LimitNOFILE=1048576
+LimitNPROC=1048576
+LimitCORE=infinity
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+
+cat > /usr/bin/docker-bootstrap <<EOF
+#!/bin/bash
+docker -H unix:///var/run/docker-bootstrap.sock "\$@"
+EOF
+chmod +x /usr/bin/docker-bootstrap
+
+
+
+systemctl daemon-reload
+systemctl restart docker-bootstrap
+
+docker-bootstrap info
+
+
+
+
+
+
+
+
+cat > /usr/local/bin/flannel-daemon <<EOF
+#!/bin/bash
+HOST_FLANNEL_PUBLIC_DEV=eth0
+HOST_ETCD_DEV=eth0
+
+if [ -f /etc/master-node ]
+  then
+    HOST_ETCD_IP=\$(ip -f inet -o addr show \$HOST_ETCD_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+    rm -rf /var/run/flannel/networks
+    docker-bootstrap stop bootstrap-etcd || true
+    docker-bootstrap rm bootstrap-etcd || true
+    docker-bootstrap run -d \
+    --name bootstrap-etcd \
+    --net=host \
+    -v /var/etcd:/var/etcd \
+    docker.io/port/system-etcd:latest \
+    etcd \
+    --name=\$(hostname -f) \
+    --data-dir=/var/etcd \
+    --listen-client-urls=http://localhost:2379,http://\${HOST_ETCD_IP}:4001 \
+    --listen-peer-urls=http://\${HOST_ETCD_IP}:7001 \
+    --advertise-client-urls=http://\$(hostname -f):4001
+    (
+    until [ -f /var/run/flannel/networks/core.env ]
+    do
+         echo "Waiting for Flannel subnet"
+         sleep 5
+    done
+    docker-bootstrap stop bootstrap-etcd || true
+    docker-bootstrap rm bootstrap-etcd || true
+    )&
+fi
+
+
+HOST_FLANNEL_PUBLIC_IP=\$(ip -f inet -o addr show \$HOST_FLANNEL_PUBLIC_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+docker-bootstrap stop flannel || true
+docker-bootstrap kill flannel || true
+docker-bootstrap rm -v flannel || true
+exec docker-bootstrap run \
+    --name flannel \
+    --net=host \
+    --privileged \
+    -v /dev/net:/dev/net:rw \
+    -v /run/flannel:/run/flannel:rw \
+    quay.io/coreos/flannel:0.5.5 \
+      /opt/bin/flanneld \
+      --ip-masq=true \
+      --alsologtostderr=true \
+      --iface=eth0 \
+      --etcd-prefix="/flannel/network" \
+      --etcd-endpoints="http://${MASTER_IP}:4001" \
+      --public-ip="\${HOST_FLANNEL_PUBLIC_IP}" \
+      -networks="core,wan"
+EOF
+chmod +x /usr/local/bin/flannel-daemon
+
+cat > /etc/systemd/system/flannel.service <<EOF
+[Unit]
+Description=Flannel per-node agent
+Requires=docker-bootstrap.service
+After=docker-bootstrap.service
+Before=docker.service
+
+[Service]
+User=root
+ExecStart=/usr/local/bin/flannel-daemon
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+
+
+systemctl daemon-reload
+systemctl restart flannel
+
+
+
+cat > /usr/local/bin/docker-daemon <<EOF
+#!/bin/bash
+set -e
+PATH=/usr/local/bin:${PATH}
+source /var/run/flannel/networks/core.env
+HOST_DOCKER_DEV=eth0
+HOST_ETCD_DEV=eth0
+
+
+HOST_DOCKER_IP=\$(ip -f inet -o addr show \$HOST_DOCKER_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+HOST_ETCD_IP=\$(ip -f inet -o addr show \$HOST_ETCD_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+
+
+ip link set docker0 down || true
+brctl delbr docker0 || true
+
+exec /usr/bin/docker-current daemon \
+        --exec-opt native.cgroupdriver=systemd \\
+        -H unix:///var/run/docker.sock \\
+        -p /var/run/docker.pid \\
+        --graph=/var/lib/docker \\
+        --bip=\${FLANNEL_SUBNET} \\
+        --mtu=\${FLANNEL_MTU} \\
+        --userland-proxy=false \\
+        --storage-driver overlay \\
+        --cluster-advertise \${HOST_DOCKER_IP}:2376 \\
+        --cluster-store etcd://${MASTER_IP}:4001
+EOF
+chmod +x /usr/local/bin/docker-daemon
+
+cat > /etc/systemd/system/docker.service <<EOF
+[Unit]
+Description=Docker Application Container Engine
+Documentation=https://docs.docker.com
+After=network-online.target cloud-init.service chronyd.service flannel.service
+Requires=flannel.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/docker-daemon
+MountFlags=slave
+LimitNOFILE=1048576
+LimitNPROC=1048576
+LimitCORE=infinity
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl restart docker
+
+
+
+cat > /usr/local/bin/docker-wan-daemon <<EOF
+#!/bin/bash
+set -e
+PATH=/usr/local/bin:${PATH}
+source /var/run/flannel/networks/wan.env
+
+ip link set dev docker1 down || true
+brctl delbr docker1 || true
+brctl addbr docker1 || true
+ip addr add \${FLANNEL_SUBNET} dev docker1 || true
+ip link set dev docker1 ${FLANNEL_MTU} || true
+ip link set dev docker1 up || true
+
+exec /usr/bin/docker-current daemon \
+        --exec-opt native.cgroupdriver=systemd \\
+        -H unix:///var/run/docker-wan.sock \\
+        -p /var/run/docker-wan.pid \\
+        --graph=/var/lib/docker-wan \\
+        --bridge=docker1 \\
+        --mtu=\${FLANNEL_MTU} \\
+        --fixed-cidr=\${FLANNEL_SUBNET} \\
+        --userland-proxy=false \\
+        --storage-driver overlay
+EOF
+chmod +x /usr/local/bin/docker-wan-daemon
+
+cat > /etc/systemd/system/docker-wan.service <<EOF
+[Unit]
+Description=Docker Wan Application Container Engine
+Documentation=https://docs.docker.com
+After=network-online.target cloud-init.service chronyd.service flannel.service
+Requires=flannel.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/docker-wan-daemon
+MountFlags=slave
+LimitNOFILE=1048576
+LimitNPROC=1048576
+LimitCORE=infinity
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+
+cat > /usr/bin/docker-wan <<EOF
+#!/bin/bash
+docker -H unix:///var/run/docker-wan.sock "\$@"
+EOF
+chmod +x /usr/bin/docker-wan
+
+
+systemctl daemon-reload
+systemctl restart docker-wan
+
+
+(
+mkdir -p /opt/cni/bin
+curl -L https://github.com/projectcalico/calico-cni/releases/download/v1.3.1/calico > /opt/cni/bin/calico
+chmod +x /opt/cni/bin/calico
+curl -L https://github.com/projectcalico/calico-cni/releases/download/v1.3.1/calico-ipam > /opt/cni/bin/calico-ipam
+chmod +x /opt/cni/bin/calico-ipam
+)
+
+
+mkdir -p /etc/cni/net.d
+cat > /etc/cni/net.d/10-calico.conf <<EOF
+{
+    "name": "calico-k8s-network",
+    "type": "calico",
+    "etcd_authority": "${MASTER_IP}:4001",
+    "log_level": "info",
+    "ipam": {
+        "type": "calico-ipam"
+    }
+}
+EOF
+
+
+cat > /etc/network-environment <<EOF
+# This host's IPv4 address (the source IP address used to reach other nodes
+# in the Kubernetes cluster).
+DEFAULT_IPV4=${HOST_CALICO_IP}
+
+# IP and port of etcd instance used by Calico
+ETCD_AUTHORITY=${MASTER_IP}:4001
+EOF
+
+cat > /etc/systemd/system/calico.service <<EOF
+[Unit]
+Description=Calico per-node agent
+Documentation=https://github.com/projectcalico/calico-docker
+Requires=docker.service
+After=docker.service
+
+[Service]
+User=root
+EnvironmentFile=/etc/network-environment
+PermissionsStartOnly=true
+ExecStart=/usr/bin/calicoctl node --ip=${HOST_CALICO_IP} --detach=false
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl restart calico
+
+cat > docker-compose.yml <<EOF
+version: "2"
+services:
+  kubelet:
+    container_name: "kubelet"
+    image: "docker.io/port/system-kube:latest"
+    restart: "always"
+    privileged: true
+    network_mode: "host"
+    pid: "host"
+    volumes:
+      - "/sys:/sys:ro"
+      - "/var/run:/var/run:rw"
+      - "/:/rootfs:ro"
+      - "/dev:/dev:rw"
+      - "/opt/cni/bin:/opt/cni/bin:rw"
+      - "/etc/cni/net.d:/etc/cni/net.d:rw"
+      - "/var/lib/docker:/var/lib/docker:rw"
+      - "/var/lib/kubelet:/var/lib/kubelet:rw"
+      - "/etc/os-release:/etc/os-release:ro"
+      - "/etc/kubernetes/manifests:/etc/kubernetes/manifests:ro"
+    command:
+      - "/hyperkube"
+      - "kubelet"
+      - "--v=3"
+      - "--address=0.0.0.0"
+      - "--allow-privileged=true"
+      - "--cluster-dns=10.100.0.10"
+      - "--cluster-domain=cluster.local"
+      - "--config=/etc/kubernetes/manifests"
+      - "--hostname-override=${HOST_CALICO_IP}"
+      - "--api-servers=http://${MASTER_IP}:8080"
+      - "--logtostderr=true"
+      - "--docker=\"unix:///var/run/docker.sock\""
+      - "--network-plugin-dir=/etc/cni/net.d"
+      - "--network-plugin=cni"
+EOF
+
+
+docker-compose up -d
+
+
+
+
+
+
+systemctl enable docker-bootstrap
+systemctl enable flannel
+systemctl enable docker
+systemctl enable calico
+
+
+cat > /etc/kubernetes/manifests/kube-proxy.manifest <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-proxy
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-proxy
+    image: docker.io/port/system-kube:latest
+    command:
+    - /hyperkube
+    - proxy
+    - --proxy-mode=iptables
+    - --alsologtostderr=true
+    - --bind-address=0.0.0.0
+    - --master=http://${MASTER_IP}:8080
+    securityContext:
+      privileged: true
+EOF
+
+kubectl get nodes
+calicoctl status
+kubectl run --image=nginx --replicas=1 nginx

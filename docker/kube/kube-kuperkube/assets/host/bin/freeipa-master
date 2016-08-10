@@ -1,0 +1,15 @@
+#!/bin/bash
+OS_HOSTNAME_SHORT=freeipa-master
+IPA_DATA_DIR=/var/lib/freeipa-master
+OS_DOMAIN=$(hostname -d)
+DNS_FOWARDER=8.8.8.8
+exec docker run -d \
+       --hostname=${OS_HOSTNAME_SHORT}.${OS_DOMAIN} \
+       --name=${OS_HOSTNAME_SHORT} \
+       -v ${IPA_DATA_DIR}:/data \
+       -v /var/run \
+       -v /sys/fs/cgroup \
+       --dns=${DNS_FOWARDER} \
+       -e FORWARDER=${DNS_FOWARDER} \
+       -e OS_DOMAIN=${OS_DOMAIN} \
+       docker.io/port/x86-freeipa:latest

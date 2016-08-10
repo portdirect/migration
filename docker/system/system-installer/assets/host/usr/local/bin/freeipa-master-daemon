@@ -1,0 +1,56 @@
+#!/bin/bash
+set -e
+PATH=${PATH}:/usr/local/bin
+source /etc/harbor/network.env
+IPA_DATA_DIR=/var/lib/harbor/freeipa/master
+
+docker-wan stop freeipa-master || true
+docker-wan kill freeipa-master || true
+docker-wan rm -v freeipa-master || true
+
+FREEIPA_MASTER_ID=$(docker-wan run -t -d \
+     --hostname=freeipa-master.${OS_DOMAIN} \
+     --name=freeipa-master \
+     -v $IPA_DATA_DIR:/data:rw \
+     -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
+     --dns=${EXTERNAL_DNS} \
+     -e OS_DOMAIN=${OS_DOMAIN} \
+     docker.io/port/ipa-server:latest)
+
+
+FREEIPA_MASTER_IP=$(docker-wan inspect --format '{{ .NetworkSettings.IPAddress }}' ${FREEIPA_MASTER_ID})
+
+
+until dig +short +time=1 +tries=20 freeipa-master.${OS_DOMAIN} @$FREEIPA_MASTER_IP; do
+   echo "Waiting For FreeIPA DNS to respond"
+   sleep 5s
+done
+
+while [ "$FREEIPA_MASTER_IP" != "$FREEIPA_MASTER_DNS_IP" ]; do
+  echo "Waiting for FreeIPA DNS to return expected IP"
+  sleep 2s
+  FREEIPA_MASTER_DNS_IP=$(dig +short +time=1 +tries=20 freeipa-master.${OS_DOMAIN} @${FREEIPA_MASTER_IP} || true )
+done
+
+echo "Checking SKYDNS Config Exists"
+SKYDNS_CONFIG="{\"dns_addr\":\"172.17.42.1:53\", \"ttl\":3600, \"nameservers\": [\"${FREEIPA_MASTER_DNS_IP}:53\"]}"
+until etcdctl-network ls /skydns/config; do
+   echo "Waiting for ETCD"
+   sleep 5s
+   etcdctl-network ls /skydns/config || etcdctl-network set /skydns/config "${SKYDNS_CONFIG}" || true
+done
+
+echo "Getting SKYDNS Config"
+until SKYDNS_CONFIG_ETCD="$(etcdctl-network get /skydns/config)"; do
+   sleep 5s
+   echo "Waiting for ETCD"
+done
+
+echo "Managing SKYDNS Config"
+if [ "${SKYDNS_CONFIG}" != "${SKYDNS_CONFIG_ETCD}" ]; then
+   echo "Updating SKYDNS Config"
+   until etcdctl-network set /skydns/config "${SKYDNS_CONFIG}"; do
+      echo "Waiting for ETCD"
+      sleep 5s
+   done
+fi

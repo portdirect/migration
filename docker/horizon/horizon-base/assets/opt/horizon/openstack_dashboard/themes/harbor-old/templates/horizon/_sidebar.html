@@ -1,0 +1,55 @@
+{% load horizon i18n %}
+
+
+  <ul id="sidebar-drawer" class="list-group">
+    {% for dashboard, panel_info in components %}
+    {% if user|has_permissions:dashboard %}
+    {% if current.slug != dashboard.slug %}
+    <li class="list-group-item list-group-item-separator hidden-sm hidden-md hidden-lg">
+      <a class="" href="#collapseSidebar-{{ dashboard.slug }}" data-toggle="collapse" data-parent="harbor-sidebar">
+        <span class="fa pficon-replicator hicon-{{ dashboard.slug }}" title="{{ dashboard.name }}" data-toggle="tooltip" data-placement="right"></span>
+        <span class="list-group-item-value">{{ dashboard.name }}</span>
+        <span class="badge">+</span>
+      </a>
+      <ul class="list-group collapse" id="collapseSidebar-{{ dashboard.slug }}">
+      {% endif %}
+
+      {% for group, panels in panel_info.iteritems %}
+      {% with panels|has_permissions_on_list:user as filtered_panels %}
+      {% if filtered_panels %}
+
+        {% if group.name %}
+        <li class="list-group-item list-group-item-separator">
+          <a href="#sidebar-accordion-{{ dashboard.slug }}-{{ group.slug }}" data-toggle="collapse" data-parent="{% if current.slug != dashboard.slug %}collapseSidebar-{{ dashboard.slug }}{% else %}harbor-sidebar{% endif %}">
+            <span class="fa fa-cubes hicon-{{ group.slug }}" title="{{ group.name }}" data-toggle="tooltip" data-placement="right"></span>
+            <span class="list-group-item-value">{{ group.name }}</span>
+            <span class="badge">+</span>
+          </a>
+        <ul class="list-group collapse {% if current_panel_group == group.slug %}in{% endif %}" id="sidebar-accordion-{{ dashboard.slug }}-{{ group.slug }}">
+        {% endif %}
+
+        {% for panel in filtered_panels %}
+        <li class="list-group-item {% if current_panel == panel.slug %}active{% endif %}">
+          <a class="openstack-spin" href="{{ panel.get_absolute_url }}" target="_self" tabindex="{{ forloop.counter }}">
+            <span class="fa fa-cube hicon-{{ panel.slug }}" title="{{ panel.name }}" data-toggle="tooltip" data-placement="right"></span>
+            <span class="list-group-item-value">{{ panel.name }}</span>
+          </a>
+        </li>
+        {% endfor %}
+
+        {% if group.name %}
+        </ul>
+        </li>
+        {% endif %}
+
+      {% endif %}
+      {% endwith %}
+      {% endfor %}
+
+      {% if current.slug != dashboard.slug %}
+      </ul>
+    </li>
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+  </ul>

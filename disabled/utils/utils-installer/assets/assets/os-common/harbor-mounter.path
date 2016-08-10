@@ -1,0 +1,8 @@
+[Unit]
+Description=HarborOS Mounter
+
+[Path]
+PathChanged=/tmp/harbor/harbor-mount
+
+[Install]
+WantedBy=multi-user.target

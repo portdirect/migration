@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    harbor-app: undercloud-nova
+    version: v0.1.0
+  name: undercloud-nova
+  namespace: node-nova
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 8774
+    targetPort: 8774
+    protocol: TCP
+    name: nova
+  selector:
+    harbor-app: undercloud-nova
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    harbor-app: undercloud-nova
+    version: v0.1.0
+  name: undercloud-nova-meta
+  namespace: node-nova
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 8775
+    targetPort: 8775
+    protocol: TCP
+    name: nova-meta
+  selector:
+    harbor-app: undercloud-nova

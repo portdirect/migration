@@ -1,0 +1,123 @@
+
+
+
+
+IPA_PASSWORD=Password123
+ADMIN_PASSWORD=${IPA_PASSWORD}
+DS_PASSWORD=${IPA_PASSWORD}
+DNS_FOWARDER=8.8.8.8
+
+IPA_DATA_DIR=/var/lib/freeipa-master
+
+: ${OS_DOMAIN:="$(hostname -d)"}
+
+OS_HOSTNAME_SHORT=freeipa-master
+
+
+KUBE_SVC_IP=10.140.0.1
+KUBE_SVC_NAME=kubernetes
+
+
+
+KUBE_SVC_AUTH_ROOT_CONTAINER=/data/harbor/auth
+KUBE_SVC_AUTH_ROOT_HOST=/etc/harbor/auth
+
+
+
+mkdir -p ${KUBE_SVC_AUTH_ROOT_HOST}/${KUBE_SVC_NAME}
+KUBE_SVC_KEY_LOC=${KUBE_SVC_AUTH_ROOT_HOST}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.key
+KUBE_SVC_CRT_LOC=${KUBE_SVC_AUTH_ROOT_HOST}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.crt
+KUBE_SVC_CA_LOC=${KUBE_SVC_AUTH_ROOT_HOST}/${KUBE_SVC_NAME}/ca.crt
+################################################################################
+echo "${OS_DISTRO}: Tailing Logs, once the server has full configured and started the go loop you may use control-c to exit"
+################################################################################
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "echo $ADMIN_PASSWORD | kinit admin"
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "ipa dnsrecord-add $(hostname -d) ${KUBE_SVC_NAME} --a-rec=${KUBE_SVC_IP}"
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "ipa host-add ${KUBE_SVC_NAME}.$(hostname -d) --desc=\"kubernetes service endpoint\" --location=\$(hostname --fqdn)"
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "ipa host-add-managedby ${KUBE_SVC_NAME}.$(hostname -d) --hosts=\$(hostname --fqdn)"
+
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "ipa service-add HTTP/${KUBE_SVC_NAME}.$(hostname -d)"
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "ipa service-add-host HTTP/${KUBE_SVC_NAME}.$(hostname -d) --hosts=\$(hostname --fqdn)"
+docker exec ${OS_HOSTNAME_SHORT} mkdir -p ${KUBE_SVC_AUTH_ROOT_CONTAINER}/${KUBE_SVC_NAME}
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "ipa-getcert request -r \
+                                                    -f ${KUBE_SVC_AUTH_ROOT_CONTAINER}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.crt \
+                                                    -k ${KUBE_SVC_AUTH_ROOT_CONTAINER}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.key \
+                                                    -N CN=${KUBE_SVC_NAME}.$(hostname -d) \
+                                                    -D ${KUBE_SVC_NAME}.$(hostname -d) \
+                                                    -K HTTP/${KUBE_SVC_NAME}.$(hostname -d)"
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "kdestroy"
+sleep 30s
+docker exec ${OS_HOSTNAME_SHORT} cat ${KUBE_SVC_AUTH_ROOT_CONTAINER}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.key > ${KUBE_SVC_KEY_LOC}
+docker exec ${OS_HOSTNAME_SHORT} cat ${KUBE_SVC_AUTH_ROOT_CONTAINER}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.crt> ${KUBE_SVC_CRT_LOC}
+docker exec ${OS_HOSTNAME_SHORT} cat /etc/ipa/ca.crt > ${KUBE_SVC_CA_LOC}
+
+
+
+KUBE_SVC_NAME=kubernetes
+KUBE_SVC_IP=$(kubectl get svc | grep ${KUBE_SVC_NAME} | awk '{print $2}')
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "echo $ADMIN_PASSWORD | kinit admin"
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "ipa dnsrecord-del $(hostname -d) ${KUBE_SVC_NAME} --del-all"
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "ipa dnsrecord-add $(hostname -d) ${KUBE_SVC_NAME} --a-rec=${KUBE_SVC_IP}""
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "kdestroy"
+KUBE_SVC_NAME=kubelet
+KUBE_SVC_AUTH_ROOT=/data/harbor/auth
+
+
+mkdir -p ${KUBE_SVC_AUTH_ROOT}/${KUBE_SVC_NAME}
+KUBE_SVC_KEY_LOC=${KUBE_SVC_AUTH_ROOT}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.key
+KUBE_SVC_CRT_LOC=${KUBE_SVC_AUTH_ROOT}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.crt
+KUBE_SVC_CA_LOC=${KUBE_SVC_AUTH_ROOT}/${KUBE_SVC_NAME}/ca.crt
+################################################################################
+echo "${OS_DISTRO}: Tailing Logs, once the server has full configured and started the go loop you may use control-c to exit"
+################################################################################
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "echo $ADMIN_PASSWORD | kinit admin"
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "ipa dnsrecord-add $(hostname -d) ${KUBE_SVC_NAME} --a-rec=${KUBE_SVC_IP}"
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "ipa host-add ${KUBE_SVC_NAME}.$(hostname -d) --desc=\"kubernetes service endpoint\" --location=\$(hostname --fqdn)"
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "ipa host-add-managedby ${KUBE_SVC_NAME}.$(hostname -d) --hosts=\$(hostname --fqdn)"
+
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "ipa service-add HTTP/${KUBE_SVC_NAME}.$(hostname -d)"
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "ipa service-add-host HTTP/${KUBE_SVC_NAME}.$(hostname -d) --hosts=\$(hostname --fqdn)"
+docker exec ${OS_HOSTNAME_SHORT} mkdir -p ${KUBE_SVC_AUTH_ROOT_CONTAINER}/${KUBE_SVC_NAME}
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "ipa-getcert request -r \
+                                                    -f ${KUBE_SVC_AUTH_ROOT_CONTAINER}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.crt \
+                                                    -k ${KUBE_SVC_AUTH_ROOT_CONTAINER}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.key \
+                                                    -N CN=${KUBE_SVC_NAME}.$(hostname -d) \
+                                                    -D ${KUBE_SVC_NAME}.$(hostname -d) \
+                                                    -K HTTP/${KUBE_SVC_NAME}.$(hostname -d)"
+docker exec ${OS_HOSTNAME_SHORT} /bin/bash -c "kdestroy"
+sleep 30s
+mkdir -p ${KUBE_SVC_AUTH_ROOT_HOST}/${KUBE_SVC_NAME}
+
+mkdir -p ${KUBE_SVC_AUTH_ROOT_HOST}/${KUBE_SVC_NAME}
+KUBE_SVC_KEY_LOC=${KUBE_SVC_AUTH_ROOT_HOST}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.key
+KUBE_SVC_CRT_LOC=${KUBE_SVC_AUTH_ROOT_HOST}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.crt
+KUBE_SVC_CA_LOC=${KUBE_SVC_AUTH_ROOT_HOST}/${KUBE_SVC_NAME}/ca.crt
+
+docker exec ${OS_HOSTNAME_SHORT} cat ${KUBE_SVC_AUTH_ROOT_CONTAINER}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.key > ${KUBE_SVC_KEY_LOC}
+docker exec ${OS_HOSTNAME_SHORT} cat ${KUBE_SVC_AUTH_ROOT_CONTAINER}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.crt> ${KUBE_SVC_CRT_LOC}
+docker exec ${OS_HOSTNAME_SHORT} cat /etc/ipa/ca.crt > ${KUBE_SVC_CA_LOC}
+
+cat > ${KUBE_SVC_AUTH_ROOT_HOST}/${KUBE_SVC_NAME}/kubeconfig.yaml << EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+  user:
+    client-certificate-data: $(docker exec ${OS_HOSTNAME_SHORT} cat ${KUBE_SVC_AUTH_ROOT}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.crt | base64 --wrap=0)
+    client-key-data: $(docker exec ${OS_HOSTNAME_SHORT} cat ${KUBE_SVC_AUTH_ROOT}/${KUBE_SVC_NAME}/${KUBE_SVC_NAME}.key | base64 --wrap=0)
+clusters:
+- name: local
+  cluster:
+    certificate-authority-data: $(docker exec ${OS_HOSTNAME_SHORT} cat /etc/ipa/ca.crt | base64 --wrap=0)
+contexts:
+- context:
+    cluster: local
+    user: kubelet
+  name: service-account-context
+current-context: service-account-context
+EOF
+
+
+
+
+TOKEN=$(head /dev/urandom | base64 --wrap=0 | head -c 64)

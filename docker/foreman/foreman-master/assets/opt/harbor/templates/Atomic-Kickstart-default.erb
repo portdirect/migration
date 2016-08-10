@@ -1,0 +1,222 @@
+<%#
+kind: provision
+name: Atomic Kickstart default
+%>
+
+<%
+  os_major = @host.operatingsystem.major.to_i
+  realm_compatible = os_major >= 7 ? true : false
+  # safemode renderer does not support unary negation
+  pm_set = @host.puppetmaster.empty? ? false : true
+  proxy_uri = @host.params['http-proxy'] ? "http://#{@host.params['http-proxy']}:#{@host.params['http-proxy-port']}" : nil
+  proxy_string = proxy_uri ? " --proxy=#{proxy_uri}" : ''
+  puppet_enabled = pm_set || @host.param_true?('force-puppet')
+  salt_enabled = @host.params['salt_master'] ? true : false
+  chef_enabled = @host.respond_to?(:chef_proxy) && @host.chef_proxy
+  section_end = os_major <= 5 ? '' : '%end'
+%>
+
+
+lang <%= @host.params['lang'] || 'en_US.UTF-8' %>
+keyboard <%= @host.params['keyboard'] || 'us' %>
+timezone --utc <%= @host.params['time-zone'] || 'UTC' %>
+
+
+
+<% subnet = @host.subnet -%>
+<% if subnet.respond_to?(:dhcp_boot_mode?) -%>
+<% dhcp = subnet.dhcp_boot_mode? && !@static -%>
+<% else -%>
+<% dhcp = !@static -%>
+<% end -%>
+
+network --bootproto <%= dhcp ? 'dhcp' : "static --ip=#{@host.ip} --netmask=#{subnet.mask} --gateway=#{subnet.gateway} --nameserver=#{[subnet.dns_primary, subnet.dns_secondary].select(&:present?).join(',')}" %> --hostname <%= @host %><%= os_major >= 6 ? " --device=#{@host.mac}" : '' -%>
+
+
+
+# Partition table should create /boot and a volume atomicos
+<% if @dynamic -%>
+%include /tmp/diskpart.cfg
+<% else -%>
+<%= @host.diskLayout %>
+<% end -%>
+
+bootloader --location=mbr --boot-drive=sda --append="ds=nocloud\;seedfrom=/var/cloud-init/"
+text
+
+<% if @host.os.name.match /.*fedora.*/i -%>
+# Use @host.operatingsystem.medium_uri(@host)}/content/repo/ as the URL if you
+# have set up a local installation media for Fedora
+<% fedora_atomic_url = @host.params['atomic_refs_url'] || "https://dl.fedoraproject.org/pub/fedora/linux/atomic/#{@host.os.major}/" %>
+ostreesetup --nogpg --osname=harbor-host --remote=harbor-host --url="http://rpmostree.harboros.net:8012/repo/" --ref=harbor-host/7/<%= @host.architecture %>/standard
+<% elsif @host.os.name.match /.*centos.*/i -%>
+ostreesetup --nogpg --osname=harbor-host --remote=harbor-host --url="http://rpmostree.harboros.net:8012/repo/" --ref=harbor-host/<%= @host.os.major %>/<%= @host.architecture %>/standard
+<% else -%>
+ostreesetup --nogpg --osname=rhel-atomic-host --remote=rhel-atomic-host --url=file:///install/ostree --ref=rhel-atomic-host/<%= @host.os.major %>/<%= @host.architecture %>/standard
+<% end -%>
+services --enabled cloud-init,cloud-config,cloud-final,cloud-init-local
+rootpw --iscrypted <%= root_pass %>
+
+reboot
+
+%post
+
+<% if subnet.respond_to?(:dhcp_boot_mode?) -%>
+<%= snippet 'kickstart_atomic_networking_setup' %>
+<% end -%>
+
+
+mkdir -p /var/cloud-init
+
+cat > /var/cloud-init/meta-data << EOC
+instance-id: <%= @host.mac %>
+local-hostname: <%= @host %>
+EOC
+
+
+cat > /var/cloud-init/user-data <<EOC
+#cloud-config
+password: letmein
+ssh_pwauth: True
+chpasswd: { expire: False }
+
+runcmd:
+  - /var/cloud-init/runcmd
+
+bootcmd:
+  - /var/cloud-init/bootcmd
+EOC
+
+cat > /var/cloud-init/bootcmd <<EOC
+#!/bin/bash
+# Run on boot once
+# Get systemd to wait for networking
+systemctl enable NetworkManager-wait-online.service
+systemctl enable chronyd
+
+
+
+EOC
+chmod +x /var/cloud-init/bootcmd
+
+cat > /var/cloud-init/runcmd <<EOC
+#!/bin/bash
+# Run on boot once
+
+
+<% if @host.info['parameters']['realm'] && @host.realm && @host.realm.realm_type == 'FreeIPA' -%>
+<%= snippet 'freeipa_register_atomic' %>
+<% end -%>
+
+
+<% if puppet_enabled %>
+<%= snippet 'puppet_setup_atomic' %>
+<% end -%>
+
+
+docker daemon --graph=/var/lib/docker --bridge=none --pidfile=/var/run/docker.pid &
+until docker info
+do
+  sleep 2s
+  echo "Waiting For Docker"
+done
+
+docker pull docker.io/port/system-installer:latest
+docker run \
+  --name=system-installer \
+  --privileged=true \
+  -v /:/host \
+  --net=host \
+  docker.io/port/system-installer:latest /init
+docker rm system-installer
+
+kill \$(cat /var/run/docker.pid)
+rm -rf /var/lib/docker
+
+
+systemctl disable harbor-etcd-master || echo "Caught error"
+systemctl mask harbor-etcd-master || echo "Caught error"
+
+
+systemctl daemon-reload
+
+
+
+puppet agent --test
+
+SVC_HOST_NAME=\$(hostname -s)
+SVC_AUTH_ROOT_HOST=/etc/harbor/auth
+PUPPET_SSL_DIR=/var/lib/puppet/ssl
+
+HOST_SVC_KEY_LOC=\${SVC_AUTH_ROOT_HOST}/\${SVC_HOST_NAME}/\${SVC_HOST_NAME}.key
+HOST_SVC_CRT_LOC=\${SVC_AUTH_ROOT_HOST}/\${SVC_HOST_NAME}/\${SVC_HOST_NAME}.crt
+HOST_SVC_CA_LOC=\${SVC_AUTH_ROOT_HOST}/\${SVC_HOST_NAME}/ca.crt
+
+mkdir -p \${SVC_AUTH_ROOT_HOST}/\${SVC_HOST_NAME}
+cat \${PUPPET_SSL_DIR}/certs/ca.pem > \${HOST_SVC_CA_LOC}
+cat \${PUPPET_SSL_DIR}/certs/\$(hostname -f).pem > \${HOST_SVC_CRT_LOC}
+cat \${PUPPET_SSL_DIR}/private_keys/\$(hostname -f).pem > \${HOST_SVC_KEY_LOC}
+mkdir -p \${SVC_AUTH_ROOT_HOST}/host/messaging
+cat \${HOST_SVC_KEY_LOC} > \${SVC_AUTH_ROOT_HOST}/host/messaging/messaging.key
+cat \${HOST_SVC_CRT_LOC} > \${SVC_AUTH_ROOT_HOST}/host/messaging/messaging.crt
+cat \${HOST_SVC_CA_LOC}  > \${SVC_AUTH_ROOT_HOST}/host/messaging/messaging-ca.crt
+mkdir -p \${SVC_AUTH_ROOT_HOST}/host/database
+cat \${HOST_SVC_KEY_LOC} > \${SVC_AUTH_ROOT_HOST}/host/database/database.key
+cat \${HOST_SVC_CRT_LOC} > \${SVC_AUTH_ROOT_HOST}/host/database/database.crt
+cat \${HOST_SVC_CA_LOC} > \${SVC_AUTH_ROOT_HOST}/host/database/database-ca.crt
+
+mkdir -p /etc/harbor/auth/kubelet
+ln -s /etc/harbor/auth/\$(hostname -s)/ca.crt /etc/harbor/auth/kubelet/ca.crt
+cat > /etc/harbor/auth/kubelet/kubeconfig.yaml << EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+  user:
+    client-certificate-data: \$( cat /etc/harbor/auth/\$(hostname -s)/\$(hostname -s).crt | base64 --wrap=0)
+    client-key-data: \$( cat /etc/harbor/auth/\$(hostname -s)/\$(hostname -s).key | base64 --wrap=0)
+clusters:
+- name: \$(echo \$(hostname -d) | tr '.' '-')
+  cluster:
+    certificate-authority-data: \$(cat /etc/harbor/auth/\$(hostname -s)/ca.crt | base64 --wrap=0)
+contexts:
+- context:
+    cluster: \$(echo \$(hostname -d) | tr '.' '-')
+    user: kubelet
+  name: service-account-context
+current-context: service-account-context
+EOF
+
+
+
+systemctl enable harbor-network-bootstrap
+systemctl enable docker-ovs
+systemctl enable docker-bootstrap
+systemctl enable harbor-ovs
+systemctl enable harbor-etcd-bootstrap
+systemctl enable harbor-etcd
+systemctl enable harbor-skydns
+systemctl enable harbor-network-ovs
+systemctl enable harbor-discs-bootstrap
+systemctl enable harbor-network-ovs
+systemctl enable harbor-kube-bootstrap
+systemctl enable docker
+systemctl enable harbor-kube-proxy
+systemctl enable harbor-kubelet
+
+MASTER_IP=\$(ping -c 1 master.\$(hostname -d) | awk -F '[()]' '/PING/{print \$2}')
+echo "\$MASTER_IP  kubernetes kubernetes.\$(hostname -d)" >> /etc/hosts
+
+
+systemctl reboot
+
+EOC
+chmod +x /var/cloud-init/runcmd
+
+# Inform the build system that we are done.
+echo "Informing Foreman that we are built"
+wget -q -O /dev/null --no-check-certificate <%= foreman_url('built') %>
+) 2>&1 | tee /root/install.post.log
+exit 0
+
+%end

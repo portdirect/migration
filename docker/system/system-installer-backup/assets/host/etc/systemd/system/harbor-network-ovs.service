@@ -1,0 +1,16 @@
+[Unit]
+Description=Harbor Open vSwitch Monitor
+After=docker-bootstrap.service harbor-network-bootstrap.service
+Requires=docker-bootstrap.service harbor-network-bootstrap.service
+
+[Service]
+TimeoutStartSec=0
+
+ExecStartPre=/usr/local/bin/harbor-network-register
+ExecStart=/usr/local/bin/harbor-network-etcd-monitor
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

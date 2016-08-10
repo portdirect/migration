@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: etcd-network
+    version: v0.1.0
+  name: etcd-network-master
+  namespace: network-system
+spec:
+  hostNetwork: true
+  containers:
+  - name: etcd-network-master
+    image: docker.io/port/system-etcd:latest
+    ports:
+    - containerPort: 401
+      hostPort: 401
+      name: etcd
+    - containerPort: 701
+      hostPort: 701
+      name: peers
+    command:
+    - etcd
+    - --name=master
+    - --data-dir=/var/etcd
+    - --listen-client-urls=https://0.0.0.0:401
+    - --listen-peer-urls=https://0.0.0.0:701
+    - --advertise-client-urls=https://etcd-network.{{OS_DOMAIN}}:4001
+    - --ca-file=/etc/os-ssl/ca.crt
+    - --cert-file=/etc/os-ssl/etcd-network.crt
+    - --key-file=/etc/os-ssl/etcd-network.key
+    - --peer-ca-file=/etc/os-ssl/ca.crt
+    - --peer-cert-file=/etc/os-ssl/etcd-network.crt
+    - --peer-key-file=/etc/os-ssl/etcd-network.key
+    volumeMounts:
+      - mountPath: /etc/os-ssl
+        name: os-ssl
+      - mountPath: /var/etcd
+        name: var-etcd
+  volumes:
+    - name: "os-ssl"
+      hostPath:
+        path: "/etc/harbor/auth/etcd-network"
+    - name: "var-etcd"
+      hostPath:
+        path: "/var/lib/harbor/etcd/network"

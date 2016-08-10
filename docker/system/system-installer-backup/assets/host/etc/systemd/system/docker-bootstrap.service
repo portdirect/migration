@@ -1,0 +1,24 @@
+[Unit]
+Description=Docker Application Container Engine
+Documentation=https://docs.docker.com
+After=network-online.target cloud-init.service chronyd.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/docker daemon \
+        -H unix:///var/run/docker-bootstrap.sock \
+        -p /var/run/docker-bootstrap.pid \
+        --iptables=false \
+        --ip-masq=false \
+        --bridge=none \
+        --graph=/var/lib/docker-bootstrap \
+        --storage-driver overlay \
+        --userland-proxy=false
+MountFlags=slave
+LimitNOFILE=1048576
+LimitNPROC=1048576
+LimitCORE=infinity
+
+[Install]
+WantedBy=multi-user.target

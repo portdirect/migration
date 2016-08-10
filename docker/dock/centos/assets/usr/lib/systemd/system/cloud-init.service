@@ -1,0 +1,26 @@
+[Unit]
+Description=Initial cloud-init job (metadata service crawler)
+After=local-fs.target network.target cloud-init-local.service
+Requires=network.target
+Wants=local-fs.target cloud-init-local.service
+
+[Service]
+RemainAfterExit=yes
+TimeoutSec=60
+
+ExecStartPre=/usr/bin/docker-init-hosts-file
+ExecStartPre=/sbin/dhclient -cf /etc/dhcp/dhclient.conf
+ExecStartPre=/usr/bin/cloud-init-wait
+ExecStartPre=/bin/bash -c "[[ -s /etc/resolv.conf ]] || echo 'nameserver 8.8.8.8' > /etc/resolv.conf "
+ExecStartPre=/usr/bin/cloud-init init
+ExecStart=/usr/bin/cloud-init modules --mode=final
+
+
+Restart=on-failure
+RestartSec=10
+
+# Output needs to appear in instance console output
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target

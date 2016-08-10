@@ -1,0 +1,78 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: etcd
+  name: os-etcd
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: "/var/lib/harbor/os-etcd"
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  labels:
+    openstack-app: etcd
+  name: os-etcd
+  namespace: os-etcd
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: etcd
+    version: v0.1.0
+  name: etcd
+  namespace: os-etcd
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: etcd
+        version: v0.1.0
+      name: openstack-etcd
+      namespace: os-etcd
+    spec:
+      nodeSelector:
+        openstack-etcd: 'true'
+        arch: 'x86'
+      containers:
+        - name: openstack-etcd
+          image:  docker.io/port/system-etcd:latest
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: etcd
+              mountPath: '/data'
+              readOnly: false
+          command:
+            - /bin/etcd
+            - --name=os-etcd
+            - --listen-client-urls=http://0.0.0.0:4001
+            - --advertise-client-urls=http://etcd.os-etcd.svc.{{OS_DOMAIN}}:4001
+            - --data-dir=/data
+          ports:
+            - containerPort: 4001
+              name: etcd
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: etcd
+          persistentVolumeClaim:
+            claimName: os-etcd

@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+# We need skydns to be responding, even though is possibly cant resolve anything
+# before docker starts intitally otherwise it will give pods bad dns...
+HOST_SKYDNS_DEV=br0
+HOST_SKYDNS_IP=$(ip -f inet -o addr show $HOST_SKYDNS_DEV|cut -d\  -f 7 | cut -d/ -f 1)
+dig +short +time=1 +tries=20 @${HOST_SKYDNS_IP}

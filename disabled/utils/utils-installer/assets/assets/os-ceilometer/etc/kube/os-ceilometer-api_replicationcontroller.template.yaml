@@ -1,0 +1,115 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-rc
+      name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+    spec:
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/ceilometer-api:{{OS_RELEASE}}
+          ports:
+          - containerPort: 8777
+            name: {{OPENSTACK_SUBCOMPONENT}}
+            protocol: TCP
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "0.2"
+            limits:
+              memory: "512Mi"
+              cpu: "0.4"
+          securityContext:
+            privileged: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-collector
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-collector-rc
+      name: {{OPENSTACK_COMPONENT}}-collector
+    spec:
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-collector
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/ceilometer-collector:{{OS_RELEASE}}
+          ports:
+          - containerPort: 4952
+            name: collector
+            protocol: UDP
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "0.2"
+            limits:
+              memory: "512Mi"
+              cpu: "0.4"
+          securityContext:
+            privileged: false
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-agent-notification
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-agent-notification-rc
+      name: {{OPENSTACK_COMPONENT}}-agent-notification
+    spec:
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-agent-notification
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/ceilometer-agent-notification:{{OS_RELEASE}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "0.2"
+            limits:
+              memory: "512Mi"
+              cpu: "0.4"
+          securityContext:
+            privileged: false
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret

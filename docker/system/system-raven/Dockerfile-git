@@ -1,0 +1,39 @@
+FROM %%DOCKER_NAMESPACE%%/%%DOCKER_PREFIX%%system-base:%%DOCKER_TAG%%
+
+ENV RAVEN_REPO="https://github.com/midonet/kuryr.git" \
+    RAVEN_BRANCH="k8s"
+
+WORKDIR /
+
+RUN apk add --no-cache \
+      python3 && \
+    apk add --no-cache --virtual build-deps \
+        gcc \
+        git \
+        linux-headers \
+        musl-dev \
+        python3-dev && \
+    python3 -m ensurepip && \
+    pip3 --no-cache-dir install --upgrade pip setuptools && \
+    git clone ${RAVEN_REPO} -b ${RAVEN_BRANCH} && \
+    cd kuryr && \
+    pip3 --no-cache-dir install --upgrade pip setuptools && \
+    pip3 install . && \
+    cd / && \
+    rm -fr /raven && \
+    apk del build-deps && \
+    mkdir -p /var/log/raven && \
+    addgroup kuryr -g 1000 && \
+    adduser -u 1000 -D -s /bin/false -G kuryr kuryr
+
+ENV SERVICE_USER="admin" \
+    SERVICE_TENANT_NAME="admin" \
+    SERVICE_PASSWORD="admin" \
+    IDENTITY_URL="http://127.0.0.1:35357/v2.0" \
+    OS_URL="http://127.0.0.1:9696" \
+    K8S_API="http://127.0.0.1:8080" \
+    SERVICE_CLUSTER_IP_RANGE="10.10.0.0/24"
+
+USER kuryr
+
+CMD ["/usr/bin/raven"]

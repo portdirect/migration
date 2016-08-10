@@ -1,0 +1,286 @@
+#!/bin/sh
+set -e
+
+# Setting defaults
+OS_DISTRO=HarborOS
+
+
+################################################################################
+echo "${OS_DISTRO}: Sourcing local environment variables"
+################################################################################
+source /etc/os-container.env
+
+
+
+: ${EXT_DEV:=brex0}
+: ${PXE_INTERFACE:=br0}
+: ${ROUTER_INTERFACE:=br0}
+: ${DNS_INTERFACE:=br0}
+: ${PXE_HTTP_INTERFACE:=br0}
+: ${PXE_HTTP_PORT:=79}
+: ${PXE_HTTP_PROTO:=http}
+
+: ${HOST_SSH_USER:="harbor"}
+: ${PXE_ETCDCTL:="etcdctl --peers=127.0.0.1:401"}
+
+: ${FREEIPA_CONTAINER_NAME:="freeipa-master"}
+
+
+
+
+MASTER_IP=$(ip -f inet -o addr show ${PXE_INTERFACE} | cut -d\  -f 7 | cut -d/ -f 1)
+
+
+provision_host_cmd () {
+    CMD="$@"
+    ssh -oStrictHostKeyChecking=no -i /home/${HOST_SSH_USER}/.ssh/id_rsa ${HOST_SSH_USER}@${HOST} "${CMD}"
+}
+
+ipa_server_cmd () {
+    CMD="$@"
+    docker exec ${FREEIPA_CONTAINER} ${CMD}
+}
+
+
+generate_host_cirt () {
+ SVC_HOST_NAME=$NODE_HOSTNAME
+ SVC_AUTH_ROOT_CONTAINER=/data/harbor/auth
+ SVC_AUTH_ROOT_HOST=/etc/harbor/auth
+
+
+ HOST_SVC_KEY_LOC=${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.key
+ HOST_SVC_CRT_LOC=${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.crt
+ HOST_SVC_CA_LOC=${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/ca.crt
+
+ mkdir -p ${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}
+ docker exec ${FREEIPA_CONTAINER_NAME} mkdir -p ${SVC_AUTH_ROOT_CONTAINER}/${SVC_HOST_NAME}
+ provision_host_cmd sudo mkdir -p ${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}
+
+
+ docker exec ${FREEIPA_CONTAINER_NAME} /bin/bash -c "echo ${IPA_HOST_ADMIN_PASSWORD} | kinit ${IPA_HOST_ADMIN_USER}"
+
+
+ docker exec ${FREEIPA_CONTAINER_NAME} /bin/bash -c "ipa service-add HTTP/${SVC_HOST_NAME}.$(hostname -d)" && \
+ (docker exec ${FREEIPA_CONTAINER_NAME} /bin/bash -c "ipa service-add-host HTTP/${SVC_HOST_NAME}.$(hostname -d) --hosts=\$(hostname --fqdn)" ;
+ docker exec ${FREEIPA_CONTAINER_NAME} /bin/bash -c "ipa-getcert request -r \
+                                                     -f ${SVC_AUTH_ROOT_CONTAINER}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.crt \
+                                                     -k ${SVC_AUTH_ROOT_CONTAINER}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.key \
+                                                     -N CN=${SVC_HOST_NAME}.$(hostname -d) \
+                                                     -D ${SVC_HOST_NAME}.$(hostname -d) \
+                                                     -K HTTP/${SVC_HOST_NAME}.$(hostname -d)" ) && sleep 30s || echo "Could not add Host, checking to sse if there are any cirts to try otherwise we will fail"
+
+ docker exec ${FREEIPA_CONTAINER_NAME} /bin/bash -c "kdestroy"
+
+ docker exec ${FREEIPA_CONTAINER_NAME} cat ${SVC_AUTH_ROOT_CONTAINER}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.key | \
+    ssh -oStrictHostKeyChecking=no -i /home/${HOST_SSH_USER}/.ssh/id_rsa ${HOST_SSH_USER}@${HOST} "cat > ${SVC_HOST_NAME}.key"
+ provision_host_cmd sudo mv ${SVC_HOST_NAME}.key ${HOST_SVC_KEY_LOC}
+
+ docker exec ${FREEIPA_CONTAINER_NAME} cat ${SVC_AUTH_ROOT_CONTAINER}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.crt | \
+    ssh -oStrictHostKeyChecking=no -i /home/${HOST_SSH_USER}/.ssh/id_rsa ${HOST_SSH_USER}@${HOST} "cat > ${SVC_HOST_NAME}.crt"
+ provision_host_cmd sudo mv ${SVC_HOST_NAME}.crt ${HOST_SVC_CRT_LOC}
+
+ docker exec ${FREEIPA_CONTAINER_NAME} cat /etc/ipa/ca.crt | \
+    ssh -oStrictHostKeyChecking=no -i /home/${HOST_SSH_USER}/.ssh/id_rsa ${HOST_SSH_USER}@${HOST} "sudo cat > ca.crt"
+ provision_host_cmd sudo mv ca.crt ${HOST_SVC_CA_LOC}
+
+
+
+  provision_host_cmd sudo mkdir -p ${SVC_AUTH_ROOT_HOST}/host/messaging
+  provision_host_cmd sudo ln ${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.key ${SVC_AUTH_ROOT_HOST}/host/messaging/messaging.key
+  provision_host_cmd sudo ln ${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.crt ${SVC_AUTH_ROOT_HOST}/host/messaging/messaging.crt
+  provision_host_cmd sudo ln ${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/ca.crt ${SVC_AUTH_ROOT_HOST}/host/messaging/messaging-ca.crt
+
+  provision_host_cmd sudo mkdir -p ${SVC_AUTH_ROOT_HOST}/host/database
+  provision_host_cmd sudo ln ${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.key ${SVC_AUTH_ROOT_HOST}/host/database/database.key
+  provision_host_cmd sudo ln ${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.crt ${SVC_AUTH_ROOT_HOST}/host/database/database.crt
+  provision_host_cmd sudo ln ${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/ca.crt ${SVC_AUTH_ROOT_HOST}/host/database/database-ca.crt
+
+
+}
+
+
+
+
+
+
+
+provision_kube_cirt () {
+ SVC_AUTH_ROOT_CONTAINER=/data/harbor/auth
+ SVC_AUTH_ROOT_HOST=/etc/harbor/auth
+
+ SVC_HOST_NAME=kubelet
+ HOST_SVC_KEY_LOC=${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.key
+ HOST_SVC_CRT_LOC=${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.crt
+ HOST_SVC_CA_LOC=${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/ca.crt
+ HOST_SVC_KUBECONFIG_LOC=${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}/kubeconfig.yaml
+
+ mkdir -p ${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}
+ docker exec ${FREEIPA_CONTAINER_NAME} mkdir -p ${SVC_AUTH_ROOT_CONTAINER}/${SVC_HOST_NAME}
+ provision_host_cmd sudo mkdir -p ${SVC_AUTH_ROOT_HOST}/${SVC_HOST_NAME}
+
+
+ docker exec ${FREEIPA_CONTAINER_NAME} cat ${SVC_AUTH_ROOT_CONTAINER}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.key > ${HOST_SVC_KEY_LOC}
+ scp -oStrictHostKeyChecking=no -i /home/${HOST_SSH_USER}/.ssh/id_rsa ${HOST_SVC_KEY_LOC} ${HOST_SSH_USER}@${HOST}:${SVC_HOST_NAME}.key
+ rm -f ${HOST_SVC_KEY_LOC}
+ provision_host_cmd sudo mv ${SVC_HOST_NAME}.key ${HOST_SVC_KEY_LOC}
+
+ docker exec ${FREEIPA_CONTAINER_NAME} cat ${SVC_AUTH_ROOT_CONTAINER}/${SVC_HOST_NAME}/${SVC_HOST_NAME}.crt> ${HOST_SVC_CRT_LOC}
+ scp -oStrictHostKeyChecking=no -i /home/${HOST_SSH_USER}/.ssh/id_rsa ${HOST_SVC_CRT_LOC} ${HOST_SSH_USER}@${HOST}:${SVC_HOST_NAME}.crt
+ rm -f ${HOST_SVC_CRT_LOC}
+ provision_host_cmd sudo mv ${SVC_HOST_NAME}.crt ${HOST_SVC_CRT_LOC}
+
+ docker exec ${FREEIPA_CONTAINER_NAME} cat /etc/ipa/ca.crt > ${HOST_SVC_CA_LOC}
+ scp -oStrictHostKeyChecking=no -i /home/${HOST_SSH_USER}/.ssh/id_rsa ${HOST_SVC_CA_LOC} ${HOST_SSH_USER}@${HOST}:ca.crt
+ rm -f ${HOST_SVC_CA_LOC}
+ provision_host_cmd sudo mv ca.crt ${HOST_SVC_CRT_LOC}
+
+ docker exec ${FREEIPA_CONTAINER_NAME} cat ${SVC_AUTH_ROOT_CONTAINER}/${SVC_HOST_NAME}/kubeconfig.yaml > ${HOST_SVC_KUBECONFIG_LOC}
+ scp -oStrictHostKeyChecking=no -i /home/${HOST_SSH_USER}/.ssh/id_rsa ${HOST_SVC_KUBECONFIG_LOC} ${HOST_SSH_USER}@${HOST}:kubeconfig.yaml
+ rm -f ${HOST_SVC_KUBECONFIG_LOC}
+ provision_host_cmd sudo mv kubeconfig.yaml ${HOST_SVC_KUBECONFIG_LOC}
+
+}
+
+
+provision_host () {
+    HOST="$1"
+    NODE_HOSTNAME="$2"
+    SERVICE_ACTIONS="restart enable"
+    echo "Making initial connection and checking we have sudo rights"
+    until ssh -oStrictHostKeyChecking=no -i /home/${HOST_SSH_USER}/.ssh/id_rsa ${HOST_SSH_USER}@${HOST} sudo ip addr
+    do
+      echo "Waiting for ${HOST} to accept connections"
+      sleep 10s
+    done
+    provision_host_cmd "sudo bash -c \"echo \\\"${MASTER_IP} master.$(hostname -d) master\\\" >> /etc/hosts\""
+    provision_host_cmd "sudo bash -c \"echo \\\"${MASTER_IP} kubernetes.$(hostname -d) kubernetes\\\" >> /etc/hosts\""
+    provision_host_cmd "sudo bash -c \"echo \\\"127.0.0.1 ${NODE_HOSTNAME}.$(hostname -d) ${NODE_HOSTNAME}\\\" >> /etc/hosts\""
+
+    provision_host_cmd "cat /etc/hosts"
+
+    provision_host_cmd "sudo systemctl daemon-reload"
+    provision_host_cmd "sudo systemctl start docker"
+    provision_host_cmd "sudo docker pull docker.io/port/system-installer:latest"
+    provision_host_cmd "sudo docker run \
+                        --privileged=true \
+                        -v /:/host \
+                        --net=host \
+                        docker.io/port/system-installer:latest /init"
+    provision_host_cmd "sudo systemctl daemon-reload"
+    provision_host_cmd "sudo systemctl stop docker"
+    provision_host_cmd "sudo rm -rf /var/lib/docker/"
+
+    provision_host_cmd "sudo systemctl disable harbor-etcd-master" || echo "Caught error"
+    provision_host_cmd "sudo systemctl mask harbor-etcd-master" || echo "Caught error"
+    provision_host_cmd "sudo systemctl restart chronyd" || echo "Caught error"
+    provision_host_cmd "sudo systemctl enable chronyd" || echo "Caught error"
+
+
+    echo "Harbor: checking hostname -f on ${HOST}"
+    provision_host_cmd "sudo hostname -f"
+    echo "Harbor: checking hostname -s on ${HOST}"
+    provision_host_cmd "sudo hostname -s"
+    echo "Harbor: checking hostname -d on ${HOST}"
+    provision_host_cmd "sudo hostname -d"
+    echo "Harbor: checking networking on ${HOST}"
+    provision_host_cmd "sudo ip addr"
+    provision_host_cmd "sudo ipa-client-install \
+                        --hostname=${NODE_HOSTNAME}.$(hostname -d) \
+                        --ip-address=${HOST} \
+                        --no-ntp \
+                        --force-join \
+                        --unattended \
+                        --principal=\"${IPA_HOST_ADMIN_USER}\" \
+                        --password=\"${IPA_HOST_ADMIN_PASSWORD}\""
+
+    echo "Harbor: checking hostname on ${HOST}"
+    provision_host_cmd "sudo hostname -f"
+    echo "Harbor: checking networking on ${HOST}"
+    provision_host_cmd "sudo ip addr"
+
+
+
+    SERVICES="docker-bootstrap \
+              harbor-network-bootstrap \
+              docker-ovs \
+              docker-bootstrap"
+    for SERVICE in $SERVICES; do
+      for ACTION in $SERVICE_ACTIONS; do
+        echo "Harbor: ${ACTION}ing ${SERVICE} on ${HOST}"
+        provision_host_cmd "sudo systemctl ${ACTION} ${SERVICE}"
+        sleep 5s
+      done
+    done
+    SERVICES="docker-bootstrap \
+              docker-ovs \
+              harbor-network-bootstrap"
+    for SERVICE in $SERVICES; do
+        echo "Harbor: Checking the Status of ${SERVICE} on ${HOST}"
+        provision_host_cmd "sudo systemctl status ${SERVICE}"
+    done
+
+    echo "Harbor: checking hostname on ${HOST}"
+    provision_host_cmd "sudo hostname -f"
+    echo "Harbor: checking networking on ${HOST}"
+    provision_host_cmd "sudo ip addr"
+
+
+    echo "Harbor: Making host cirtificates"
+    generate_host_cirt
+
+    echo "Harbor: copying kube cirts and config to host"
+    provision_kube_cirt
+
+    SERVICES="harbor-ovs \
+              harbor-etcd-bootstrap \
+              harbor-etcd \
+              harbor-skydns \
+              harbor-network-ovs \
+              harbor-discs-bootstrap \
+              harbor-kube-bootstrap \
+              docker"
+    for SERVICE in $SERVICES; do
+      for ACTION in $SERVICE_ACTIONS; do
+        echo "Harbor: ${ACTION}ing ${SERVICE} on ${HOST}"
+        provision_host_cmd "sudo systemctl ${ACTION} ${SERVICE}"
+      done
+    done
+
+    provision_host_cmd "sudo PATH=/usr/local/bin:\${PATH} /usr/local/bin/ovs-vsctl show"
+    provision_host_cmd "sudo systemctl enable harbor-kubelet"
+    provision_host_cmd "sudo systemctl enable harbor-kube-proxy"
+    provision_host_cmd "sudo PATH=/usr/local/bin:\${PATH} /usr/local/bin/etcdctl ls"
+    NODE_HOSTNAME=$(provision_host_cmd "hostname -s")
+    etcdctl set /harboros/nodes/${NODE_HOSTNAME}/provisioned 'True'
+    provision_host_cmd "sudo shutdown -r 1"
+}
+
+
+
+
+provision_hosts () {
+    echo "Harbor: Checking for unprovisioned hosts"
+    $PXE_ETCDCTL ls --recursive | \
+        while read ETCD_KEY; do
+          STATUS=$(etcdctl get /harboros/nodes${ETCD_KEY}/provisioned || etcdctl set /harboros/nodes${ETCD_KEY}/provisioned 'False')
+          NODE=$($PXE_ETCDCTL get "$ETCD_KEY")
+          if [ "${STATUS}" == "False" ]; then
+            echo "Node has been found that is not provisioned: ${NODE} "
+            if [ "$(sipcalc ${NODE} | grep ERR)" == "" ]; then
+              echo "Node has valid ip address, attempting provision the Harbor Platform"
+              HOST=${NODE}
+              NODE_HOSTNAME=$( echo ${ETCD_KEY} | sed -e 's/^\///' )
+              etcdctl set /harboros/nodes${ETCD_KEY}/provisioned 'In-Progress'
+              provision_host ${HOST} ${NODE_HOSTNAME}
+            fi
+          else
+            echo "Node: ${NODE} is not marked as \"False\" at /harboros/nodes${ETCD_KEY}/provisioned"
+            echo "Node: ${NODE} is currently \"${STATUS}\""
+          fi
+        done
+}
+
+
+
+
+provision_hosts

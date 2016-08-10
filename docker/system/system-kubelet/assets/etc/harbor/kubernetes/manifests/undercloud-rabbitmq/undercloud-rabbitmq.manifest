@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    harbor-app: undercloud-rabbitmq
+    version: v0.1.0
+  name: undercloud-rabbitmq
+  namespace: node-rabbitmq
+spec:
+  hostNetwork: true
+  containers:
+  - name: undercloud-rabbitmq
+    image: docker.io/port/undercloud-rabbitmq:latest
+    ports:
+      - containerPort: 5672
+        hostPort: 5672
+        name: mysql
+    env:
+      - name: EXPOSED_IP
+        value: {{EXPOSED_IP}}
+    command:
+      - /start.sh

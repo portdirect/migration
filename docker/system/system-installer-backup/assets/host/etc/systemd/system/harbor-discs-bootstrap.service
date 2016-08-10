@@ -1,0 +1,34 @@
+[Unit]
+Description=Discs Bootstrap
+After=network.target docker-bootstrap.service
+Before=docker.service
+After=docker-bootstrap.service harbor-etcd.service
+Requires=docker-bootstrap.service harbor-etcd.service
+
+[Service]
+StandardOutput=null
+TimeoutStartSec=0
+RemainAfterExit=yes
+Type=simple
+ExecStartPre=-/usr/local/bin/harbor-docker pull  docker.io/port/system-discs:latest
+
+ExecStartPre=-/usr/local/bin/harbor-docker stop discs-install
+ExecStartPre=-/usr/local/bin/harbor-docker kill discs-install
+ExecStartPre=-/usr/local/bin/harbor-docker rm discs-install
+ExecStartPre=/usr/local/bin/harbor-docker run \
+              --name discs-install \
+              --net=host \
+              -v /:/host \
+               docker.io/port/system-discs:latest harbor-install
+ExecStartPre=-/usr/local/bin/harbor-docker stop discs-install
+ExecStartPre=-/usr/local/bin/harbor-docker kill discs-install
+ExecStartPre=/usr/local/bin/harbor-docker rm discs-install
+ExecStartPre=/usr/local/bin/harbor-disc-reporter
+ExecStart=/usr/local/bin/harbor-disc-prep
+
+
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

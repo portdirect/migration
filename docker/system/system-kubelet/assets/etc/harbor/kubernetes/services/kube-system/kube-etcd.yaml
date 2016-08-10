@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    harbor-app: kube-etcd
+    version: v0.1.0
+  name: kube-etcd
+  namespace: kube-system
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 1401
+    targetPort: 1401
+    protocol: TCP
+    name: etcd
+  - port: 1701
+    targetPort: 1701
+    protocol: TCP
+    name: peers
+  selector:
+    harbor-app: kube-etcd

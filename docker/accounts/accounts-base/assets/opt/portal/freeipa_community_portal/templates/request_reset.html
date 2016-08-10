@@ -1,0 +1,54 @@
+{# password reset request form #}
+
+{% extends "layout.html" %}
+{% block content %}
+<div class="row">
+  <div class="col-xs-12">
+    <h2>Request a Password Reset</h2>
+
+    {% if errors %}
+    <div class="row">
+        <div class="alert alert-danger col-sm-offset-2 col-sm-6">
+            <p>{{ errors }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <form action="/request_reset" method="POST" class="form-horizontal">
+        <div class="form-group">
+            <label for="username" class="col-sm-2 control-label">
+                Username:
+            </label>
+            <div class="col-sm-6">
+                <input type="text" class="form-control" name="username" />
+            </div>
+        </div>
+        <div style='display: none'>
+            <input type="hidden" name="solution"
+                    value="{{ captcha.solution_hash() }}" />
+        </div>
+        <div class="form-group">
+            <div class="col-sm-offset-2 col-sm-6">
+                <img src='{{ captcha.datauri() }}'>
+                <p class="help-block">
+                    Type the letters and numbers in the box
+                </p>
+                <label for="response" class="control-label">Answer:</label>
+                <input type="text" class="form-control" name="response" />
+            </div>
+        </div>
+        <div class="col-sm-offset-2 col-sm-6">
+            <button type="submit" class="btn btn-primary btn-lg">
+                Request Reset
+            </button>
+        </div>
+    </form>
+  </div>
+</div>
+<div class="row">
+  <div class="col-xs-12">
+    <h2>Finish Password Reset</h2>
+    <p> If you have recieved a password reset token you can validate it and get a temporary password <a href="/reset_password">here</a>.</p>  
+  </div>
+</div>
+{% endblock %}

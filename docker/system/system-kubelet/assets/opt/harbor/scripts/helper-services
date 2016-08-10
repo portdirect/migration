@@ -1,0 +1,14 @@
+#!/bin/sh
+. /opt/harbor/scripts/environment-variables
+
+KUBE_MANIFESTS_DIR=/etc/kubernetes/manifests
+TEMPLATE_MANIFESTS_DIR=/etc/harbor/kubernetes/manifests
+
+
+prep_manifests () {
+  ROLE=$1
+  COMPONENTS="$(ls ${TEMPLATE_MANIFESTS_DIR}/${ROLE})"
+  for COMPONENT in $COMPONENTS; do
+    kubectl ${COMPONENT}
+  done
+}

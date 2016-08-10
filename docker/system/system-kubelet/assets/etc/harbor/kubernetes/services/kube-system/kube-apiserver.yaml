@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    harbor-app: kube-apiserver
+    version: v0.1.0
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  clusterIP: 'None'
+  sessionAffinity: 'ClientIP'
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: kube-api
+  selector:
+    harbor-app: kube-apiserver

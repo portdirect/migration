@@ -1,0 +1,430 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: murano-manager
+  namespace: os-murano
+type: Opaque
+data:
+  kube-endpoint: {{KUBE_ENDPOINT}}
+  ipa-user-admin-user: {{IPA_USER_ADMIN_USER}}
+  ipa-user-admin-password: {{IPA_USER_ADMIN_PASSWORD}}
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  keystone-admin-token: {{KEYSTONE_ADMIN_TOKEN}}
+  keystone-admin-user: {{KEYSTONE_ADMIN_USER}}
+  keystone-admin-project: {{KEYSTONE_ADMIN_PROJECT}}
+  keystone-admin-password: {{KEYSTONE_ADMIN_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  murano-keystone-user: {{MURANO_KEYSTONE_USER}}
+  murano-keystone-password: {{MURANO_KEYSTONE_PASSWORD}}
+  murano-db-name: {{MURANO_DB_NAME}}
+  murano-db-user: {{MURANO_DB_USER}}
+  murano-db-password: {{MURANO_DB_PASSWORD}}
+  murano-rabbitmq-user: {{MURANO_RABBITMQ_USER}}
+  murano-rabbitmq-password: {{MURANO_RABBITMQ_PASS}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: murano-manager
+    version: v0.1.0
+  name: murano-manager
+  namespace: os-murano
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: murano-manager
+        version: v0.1.0
+      name: murano-manager
+      namespace: os-murano
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: murano-manager
+          image:  docker.io/port/murano-manager:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/ipa/ca.crt
+              readOnly: true
+            - name: ipa-config
+              mountPath: /etc/ipa/default.conf
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+          securityContext:
+            privileged: false
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: murano-manager
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: ipa-config
+          hostPath:
+            path: /etc/ipa/default.conf
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker-ipa.sock
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: murano-image-builder
+  namespace: os-murano
+type: Opaque
+data:
+  murano-keystone-user: {{MURANO_KEYSTONE_USER}}
+  murano-keystone-password: {{MURANO_KEYSTONE_PASSWORD}}
+---
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  labels:
+    openstack-app: murano-image-builder
+    version: v0.1.0
+  name: murano-image-builder
+  namespace: os-murano
+spec:
+  template:
+    metadata:
+      labels:
+        openstack-app: murano-image-builder
+        version: v0.1.0
+      name: murano-image-builder
+      namespace: os-murano
+    spec:
+      nodeSelector:
+        freeipa: 'master'
+        arch: 'x86'
+      containers:
+        - name: murano-image-builder
+          image:  docker.io/port/murano-image-builder:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: '/etc/os-config'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/ipa/ca.crt
+              readOnly: true
+            - name: docker-binary
+              mountPath: "/bin/docker"
+              readOnly: true
+            - name: docker-socket
+              mountPath: "/var/run/docker.sock"
+              readOnly: false
+            - name: host-dev
+              mountPath: "/dev"
+              readOnly: false
+          securityContext:
+            privileged: true
+      restartPolicy: OnFailure
+      volumes:
+        - name: os-config
+          secret:
+            secretName: murano-image-builder
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: docker-binary
+          hostPath:
+            path: /usr/bin/docker-current
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+        - name: host-dev
+          hostPath:
+            path: /dev
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: murano
+  namespace: os-murano
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  murano-keystone-user: {{MURANO_KEYSTONE_USER}}
+  murano-keystone-password: {{MURANO_KEYSTONE_PASSWORD}}
+  murano-db-name: {{MURANO_DB_NAME}}
+  murano-db-user: {{MURANO_DB_USER}}
+  murano-db-password: {{MURANO_DB_PASSWORD}}
+  murano-rabbitmq-user: {{MURANO_RABBITMQ_USER}}
+  murano-rabbitmq-password: {{MURANO_RABBITMQ_PASS}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: murano
+    version: v0.1.0
+  name: murano
+  namespace: os-murano
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: murano
+        version: v0.1.0
+      name: murano
+      namespace: os-murano
+    spec:
+      nodeSelector:
+        openstack-murano: 'true'
+        arch: 'x86'
+      containers:
+        - name: murano-api
+          image: docker.io/port/murano-api:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          ports:
+          - containerPort: 8082
+            name: http
+            protocol: TCP
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: os-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: os-murano
+              mountPath: "/var/lib/murano"
+          securityContext:
+            privileged: false
+        - name: murano-memcached
+          image: docker.io/port/system-memcached:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "0.1"
+            limits:
+              memory: "64Mi"
+              cpu: "0.2"
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: murano
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: os-ssl
+          secret:
+            secretName: murano-ssl-secret
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: os-murano
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: murano-engine
+  namespace: os-murano
+type: Opaque
+data:
+  ipa-host-admin-user: {{IPA_HOST_ADMIN_USER}}
+  ipa-host-admin-password: {{IPA_HOST_ADMIN_PASSWORD}}
+  mariadb-root-password: {{DB_ROOT_PASSWORD}}
+  mariadb-test-database: {{MARIADB_DATABASE}}
+  mariadb-test-user: {{MARIADB_USER}}
+  mariadb-test-password: {{MARIADB_PASSWORD}}
+  rabbitmq-user: {{RABBITMQ_USER}}
+  rabbitmq-password: {{RABBITMQ_PASS}}
+  murano-keystone-user: {{MURANO_KEYSTONE_USER}}
+  murano-keystone-password: {{MURANO_KEYSTONE_PASSWORD}}
+  murano-db-name: {{MURANO_DB_NAME}}
+  murano-db-user: {{MURANO_DB_USER}}
+  murano-db-password: {{MURANO_DB_PASSWORD}}
+  murano-rabbitmq-user: {{MURANO_RABBITMQ_USER}}
+  murano-rabbitmq-password: {{MURANO_RABBITMQ_PASS}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: murano-engine
+    version: v0.1.0
+  name: murano-engine
+  namespace: os-murano
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: murano-engine
+        version: v0.1.0
+      name: murano-engine
+      namespace: os-murano
+    spec:
+      nodeSelector:
+        openstack-murano: 'true'
+        arch: 'x86'
+      containers:
+        - name: murano-engine
+          image: docker.io/port/murano-engine:latest
+          imagePullPolicy: Always
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: os-ssl-database
+              mountPath: '/etc/os-ssl-database'
+              readOnly: true
+            - name: os-ssl-messaging
+              mountPath: '/etc/os-ssl-messaging'
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+            - name: os-murano
+              mountPath: "/var/lib/murano"
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: murano-engine
+        - name: os-ssl-database
+          hostPath:
+            path: /etc/harbor/auth/host/database
+        - name: os-ssl-messaging
+          hostPath:
+            path: /etc/harbor/auth/host/messaging
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt
+        - name: os-murano
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: murano-messaging-config
+  namespace: os-murano
+type: Opaque
+data:
+  murano-rabbitmq-user: {{MURANO_RABBITMQ_USER}}
+  murano-rabbitmq-password: {{MURANO_RABBITMQ_PASS}}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    openstack-app: murano-messaging
+    version: v0.1.0
+  name: murano-messaging
+  namespace: os-murano
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        openstack-app: murano-messaging
+        version: v0.1.0
+      name: murano-messaging
+      namespace: os-murano
+    spec:
+      nodeSelector:
+        openstack-messaging: 'true'
+        arch: 'x86'
+      containers:
+        - name: murano-messaging
+          image:  docker.io/port/rabbitmq-murano:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5671
+              protocol: TCP
+              name: rabbitmq
+          env:
+            - name: OS_DOMAIN
+              value: {{OS_DOMAIN}}
+          volumeMounts:
+            - name: os-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: ipa-ca-crt
+              mountPath: /etc/pki/tls/certs/ca-bundle.crt
+              readOnly: true
+      restartPolicy: Always
+      volumes:
+        - name: os-config
+          secret:
+            secretName: murano-messaging-config
+        - name: ipa-ca-crt
+          hostPath:
+            path: /etc/ipa/ca.crt

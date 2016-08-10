@@ -1,0 +1,82 @@
+{
+    "comment": "HarborOS derived from CentOS Atomic Host",
+
+    "osname": "harbor-host",
+    "ref": "harbor-host/7/x86_64/standard",
+
+    "repos": ["CentOS-Base", "CentOS-updates", "CentOS-extras",
+              "rhel-atomic-rebuild", "CentOS-CR",
+              "mkosek-freeipa", "elrepo-kernel", "epel", "cloud7-openstack-common-release",
+              "Harbor", "docker", "cockpit-preview", "Harbor-universal"],
+
+    "selinux": true,
+
+    "bootstrap_packages": ["filesystem", "glibc", "nss-altfiles", "shadow-utils",
+                           "centos-release-atomic"],
+
+    "install-langs": ["en_US"],
+
+    "documentation": false,
+
+    "initramfs-args": ["--no-hostonly", "--add", "iscsi"],
+
+    "postprocess-script": "treecompose-post.sh",
+
+    "etc-group-members": ["wheel", "docker"],
+
+    "ignore-removed-users": ["root"],
+    "ignore-removed-groups": ["root"],
+    "check-passwd": { "type": "file", "filename": "passwd" },
+    "check-groups": { "type": "file", "filename": "group" },
+
+    "packages": ["systemd", "kernel-ml", "rpm-ostree-client",
+		 "dracut-network",
+		 "biosdevname",
+		 "coreutils",
+		 "lvm2",
+		 "grub2", "grub2-efi", "ostree-grub2",
+		 "efibootmgr", "shim",
+		 "e2fsprogs", "xfsprogs",
+		 "mdadm",
+		 "docker-engine",
+		 "docker-engine-selinux",
+		 "selinux-policy-targeted",
+		 "sssd",
+		 "cloud-init",
+		 "cloud-utils-growpart",
+		 "kexec-tools",
+		 "bridge-utils",
+		 "subscription-manager",
+		 "subscription-manager-plugin-ostree",
+		 "subscription-manager-plugin-container",
+		 "libssh", "openssh-server", "openssh-clients",
+		 "chrony",
+		 "logrotate",
+		 "passwd",
+		 "NetworkManager", "nano",
+		 "sudo",
+		 "tuned", "tuned-profiles-atomic",
+		 "irqbalance",
+		 "bash-completion",
+		 "tmux",
+		 "net-tools",
+		 "authconfig",
+		 "policycoreutils-python",
+		 "cockpit-bridge",
+		 "cockpit-shell",
+     "cockpit-storaged",
+     "cockpit-networkmanager",
+		 "cockpit-kubernetes",
+     "harbor-cockpit",
+		 "setools-console",
+		 "ipa-client", "oddjob", "oddjob-mkhomedir", "realmd",
+     "device-mapper-multipath", "glusterfs-fuse"
+     "harbor-docker-compose" "harbor-pipework"],
+
+    "remove-from-packages": [["yum", "yum-plugin-fastestmirror", "/usr/bin/.*"],
+			     ["filesystem", "/usr/share/backgrounds"]],
+
+    "units": ["tuned.service"],
+
+    "default_target": "multi-user.target"
+}

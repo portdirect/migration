@@ -1,0 +1,184 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-scheduler
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-scheduler-rc
+      name: {{OPENSTACK_COMPONENT}}-scheduler
+    spec:
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-scheduler
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/nova-scheduler:{{OS_RELEASE}}
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}-scheduler.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          securityContext:
+            privileged: false
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-conductor
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-conductor-rc
+      name: {{OPENSTACK_COMPONENT}}-conductor
+    spec:
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-conductor
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/nova-conductor:{{OS_RELEASE}}
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}-scheduler.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "0.1"
+            limits:
+              memory: "512Mi"
+              cpu: "1"
+          securityContext:
+            privileged: false
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-consoleauth
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-consoleauth-rc
+      name: {{OPENSTACK_COMPONENT}}-consoleauth
+    spec:
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-consoleauth
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/nova-consoleauth:{{OS_RELEASE}}
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}-consoleauth.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "0.1"
+            limits:
+              memory: "256Mi"
+              cpu: "0.5"
+          securityContext:
+            privileged: false
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-novncproxy
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-novncproxy-rc
+      name: {{OPENSTACK_COMPONENT}}-novncproxy
+    spec:
+      nodeSelector:
+        nova-novncproxy: 'true'
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-novncproxy
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/nova-novncproxy:{{OS_RELEASE}}
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}-novncproxy.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "0.1"
+            limits:
+              memory: "512Mi"
+              cpu: "1"
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENT}}-secret
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name:  {{OPENSTACK_COMPONENT}}-spicehtml5proxy
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-spicehtml5proxy-rc
+      name: {{OPENSTACK_COMPONENT}}-spicehtml5proxy
+    spec:
+      nodeSelector:
+        nova-novncproxy: 'true'
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}-spicehtml5proxy
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/nova-spicehtml5proxy:{{OS_RELEASE}}
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}-spicehtml5proxy.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENET}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+            - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENET}}-ssl
+              mountPath: "/etc/os-ssl"
+              readOnly: true
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "0.1"
+            limits:
+              memory: "512Mi"
+              cpu: "1"
+          securityContext:
+            privileged: false
+      hostNetwork: true
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENET}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENET}}-secret
+        - name: {{OPENSTACK_COMPONENT}}-{{OPENSTACK_SUBCOMPONENET}}-ssl
+          secret:
+            secretName: spice-ssl-secret

@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: {{OPENSTACK_COMPONENT}}
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{OPENSTACK_COMPONENT}}-rc
+      name: {{OPENSTACK_COMPONENT}}
+    spec:
+      containers:
+        - name: {{OPENSTACK_COMPONENT}}
+          image: {{OS_REGISTRY}}/{{OS_DISTRO}}/rabbitmq:{{OS_RELEASE}}
+          ports:
+            - containerPort: 5672
+          env:
+            - name: OS_HOSTNAME
+              value: {{OPENSTACK_COMPONENT}}.{{OS_DOMAIN}}
+          volumeMounts:
+            - name: {{OPENSTACK_COMPONENT}}-config
+              mountPath: "/etc/os-config"
+              readOnly: true
+          resources:
+            limits:
+              cpu: "0.5"
+          securityContext:
+            privileged: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: {{OPENSTACK_COMPONENT}}-config
+          secret:
+            secretName: {{OPENSTACK_COMPONENT}}
